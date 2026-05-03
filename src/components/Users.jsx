@@ -1,0 +1,245 @@
+import { useState } from 'react';
+import { AUDIT_LOGS } from '../data/mockData';
+
+const ROLE_INFO = {
+  superadmin: { label: 'Super Admin', color: 'danger', icon: 'bi-shield-fill-check' },
+  admin:       { label: 'Admin',       color: 'warning', icon: 'bi-person-badge-fill' },
+  cashier:     { label: 'Cashier',     color: 'success', icon: 'bi-cash-coin' },
+};
+
+const EMPTY_USER = { name: '', username: '', password: '', role: 'cashier', active: true };
+
+export default function Users({ users, setUsers, currentUser }) {
+  const [showModal, setShowModal] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [form, setForm] = useState(EMPTY_USER);
+  const [showPass, setShowPass] = useState(false);
+  const [activeTab, setActiveTab] = useState('users');
+  const [toggleId, setToggleId] = useState(null);
+
+  const displayUsers = users.filter(u => u.id !== currentUser.id);
+
+  const openAdd = () => { setForm(EMPTY_USER); setEditUser(null); setShowModal(true); setShowPass(true); };
+  const openEdit = (u) => { setForm({ ...u }); setEditUser(u); setShowModal(true); setShowPass(false); };
+
+  const handleSave = () => {
+    if (!form.name || !form.username || (!editUser && !form.password)) return;
+    if (editUser) {
+      setUsers(prev => prev.map(u => u.id === editUser.id ? { ...u, ...form } : u));
+    } else {
+      const newId = Math.max(...users.map(u => u.id)) + 1;
+      setUsers(prev => [...prev, { ...form, id: newId, createdAt: new Date().toISOString().split('T')[0] }]);
+    }
+    setShowModal(false);
+  };
+
+  const handleToggle = (id) => {
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u));
+    setToggleId(null);
+  };
+
+  return (
+    <div>
+      {/* Tabs */}
+      <div className="d-flex gap-2 mb-4">
+        <button className={`btn btn-sm ${activeTab === 'users' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setActiveTab('users')}>
+          <i className="bi bi-people me-2"></i>User Management
+        </button>
+        <button className={`btn btn-sm ${activeTab === 'logs' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setActiveTab('logs')}>
+          <i className="bi bi-journal-text me-2"></i>Audit Logs
+        </button>
+      </div>
+
+      {activeTab === 'users' && (
+        <>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <span className="me-3 small text-muted"><i className="bi bi-people me-1"></i>{users.length} total users</span>
+              <span className="small text-muted"><i className="bi bi-circle-fill text-success me-1" style={{ fontSize: '0.6rem' }}></i>{users.filter(u => u.active).length} active</span>
+            </div>
+            <button className="btn btn-dark" onClick={openAdd}>
+              <i className="bi bi-person-plus me-2"></i>Add User
+            </button>
+          </div>
+
+          <div className="row g-3 mb-4">
+            {Object.entries(ROLE_INFO).map(([role, info]) => {
+              const count = users.filter(u => u.role === role).length;
+              return (
+                <div className="col-4" key={role}>
+                  <div className={`card text-center py-3 border-${info.color} border`}>
+                    <i className={`bi ${info.icon} fs-3 text-${info.color}`}></i>
+                    <div className="fw-bold fs-5 mt-1">{count}</div>
+                    <div className="small text-muted">{info.label}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="card card-custom">
+            <div className="card-header-custom"><i className="bi bi-people me-2"></i>All Users</div>
+            <div className="table-responsive">
+              <table className="table table-hover mb-0 align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th className="text-center">Status</th>
+                    <th>Created</th>
+                    <th className="text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => {
+                    const ri = ROLE_INFO[u.role];
+                    const isSelf = u.id === currentUser.id;
+                    return (
+                      <tr key={u.id} className={isSelf ? 'table-light' : ''}>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <div className="user-avatar-sm">{u.name.charAt(0)}</div>
+                            <div>
+                              <div className="fw-semibold small">{u.name}</div>
+                              {isSelf && <span className="badge bg-light text-dark border" style={{ fontSize: '0.65rem' }}>You</span>}
+                            </div>
+                          </div>
+                        </td>
+                        <td><code className="small">{u.username}</code></td>
+                        <td>
+                          <span className={`badge bg-${ri.color}${ri.color === 'warning' ? ' text-dark' : ''}`}>
+                            <i className={`bi ${ri.icon} me-1`}></i>{ri.label}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          <span className={`badge ${u.active ? 'bg-success' : 'bg-secondary'}`}>
+                            {u.active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="text-muted small">{u.createdAt}</td>
+                        <td className="text-center">
+                          <div className="d-flex gap-1 justify-content-center">
+                            <button className="btn btn-outline-secondary btn-sm" onClick={() => openEdit(u)} disabled={isSelf} title="Edit">
+                              <i className="bi bi-pencil"></i>
+                            </button>
+                            <button
+                              className={`btn btn-sm ${u.active ? 'btn-outline-warning' : 'btn-outline-success'}`}
+                              onClick={() => setToggleId(u.id)}
+                              disabled={isSelf}
+                              title={u.active ? 'Deactivate' : 'Activate'}
+                            >
+                              <i className={`bi ${u.active ? 'bi-person-x' : 'bi-person-check'}`}></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="card card-custom">
+          <div className="card-header-custom"><i className="bi bi-journal-text me-2"></i>Activity Audit Log</div>
+          <div className="table-responsive">
+            <table className="table table-hover mb-0 align-middle small">
+              <thead className="table-light">
+                <tr><th>#</th><th>User</th><th>Action</th><th>Timestamp</th></tr>
+              </thead>
+              <tbody>
+                {AUDIT_LOGS.slice().reverse().map(log => (
+                  <tr key={log.id}>
+                    <td className="text-muted">{log.id}</td>
+                    <td className="fw-semibold">{log.user}</td>
+                    <td>{log.action}</td>
+                    <td className="text-muted">{log.timestamp}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
+      {showModal && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title"><i className="bi bi-person-plus me-2"></i>{editUser ? 'Edit User' : 'Add New User'}</h5>
+                <button className="btn-close" onClick={() => setShowModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-semibold">Full Name *</label>
+                    <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Juan Dela Cruz" />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label fw-semibold">Username *</label>
+                    <input className="form-control" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="e.g. cashier1" />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label fw-semibold">Role *</label>
+                    <select className="form-select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+                      <option value="cashier">Cashier</option>
+                      <option value="admin">Admin</option>
+                      <option value="superadmin">Super Admin</option>
+                    </select>
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label fw-semibold">{editUser ? 'New Password (leave blank to keep)' : 'Password *'}</label>
+                    <div className="input-group">
+                      <input type={showPass ? 'text' : 'password'} className="form-control" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={editUser ? 'Leave blank to keep current' : 'Enter password'} />
+                      <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPass(!showPass)}>
+                        <i className={`bi ${showPass ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="col-12">
+                    <div className="form-check form-switch">
+                      <input className="form-check-input" type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} id="activeCheck" />
+                      <label className="form-check-label" htmlFor="activeCheck">Account Active</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-outline-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button className="btn btn-dark" onClick={handleSave} disabled={!form.name || !form.username || (!editUser && !form.password)}>
+                  <i className="bi bi-check2 me-2"></i>Save User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toggle Confirm */}
+      {toggleId && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content">
+              <div className="modal-body text-center py-4">
+                {users.find(u => u.id === toggleId)?.active
+                  ? <><i className="bi bi-person-x-fill text-warning fs-1 d-block mb-3"></i><h5>Deactivate user?</h5><p className="text-muted small">They won't be able to log in.</p></>
+                  : <><i className="bi bi-person-check-fill text-success fs-1 d-block mb-3"></i><h5>Activate user?</h5><p className="text-muted small">They will be able to log in again.</p></>
+                }
+              </div>
+              <div className="modal-footer justify-content-center gap-2">
+                <button className="btn btn-outline-secondary" onClick={() => setToggleId(null)}>Cancel</button>
+                <button className="btn btn-dark" onClick={() => handleToggle(toggleId)}>Confirm</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
