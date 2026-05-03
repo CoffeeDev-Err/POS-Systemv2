@@ -9,17 +9,17 @@ const STORE_INFO = {
 
 // Known category visual config — fallback palette for custom categories
 const KNOWN_CONFIG = {
-  'Eggs':        { emoji: '🥚', color: '#f59e0b' },
-  'Mantika':     { emoji: '🫙', color: '#3b82f6' },
-  'Daily Needs': { emoji: '🛍️', color: '#10b981' },
+  'Eggs':        { emoji: '', color: '#f59e0b' },
+  'Mantika':     { emoji: '', color: '#3b82f6' },
+  'Daily Needs': { emoji: '', color: '#10b981' },
 };
 const PALETTE = [
-  { emoji: '📦', color: '#8b5cf6' },
-  { emoji: '🏪', color: '#ef4444' },
-  { emoji: '🧴', color: '#f97316' },
-  { emoji: '🥫', color: '#06b6d4' },
-  { emoji: '🧃', color: '#84cc16' },
-  { emoji: '🍬', color: '#ec4899' },
+  { emoji: '', color: '#8b5cf6' },
+  { emoji: '', color: '#ef4444' },
+  { emoji: '', color: '#f97316' },
+  { emoji: '', color: '#06b6d4' },
+  { emoji: '', color: '#84cc16' },
+  { emoji: '', color: '#ec4899' },
 ];
 const getCatConfig = (cat, allCats) => {
   if (KNOWN_CONFIG[cat]) return KNOWN_CONFIG[cat];
@@ -241,15 +241,17 @@ export default function POS({ products, setProducts, transactions, setTransactio
           <div className="pos-products-title">
             <i className="bi bi-grid-3x3-gap me-2"></i>Product Reference
           </div>
-          <div className="input-group input-group-sm" style={{ maxWidth: 200 }}>
-            <span className="input-group-text bg-light"><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }}></i></span>
-            <input
-              type="text"
-              className="form-control form-control-sm"
-              placeholder="Search..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+          <div className="d-flex gap-1">
+            <div className="input-group input-group-sm" style={{ maxWidth: 200 }}>
+              <span className="input-group-text bg-light"><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }}></i></span>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Search..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -313,55 +315,34 @@ export default function POS({ products, setProducts, transactions, setTransactio
       {/* ═════════════ RIGHT: Transaction Panel ═════════════ */}
       <div className="pos-cart">
 
-        {/* BT POS Machine Connection */}
-        <div className="bt-pos-widget">
-          <div className="bt-pos-title">
-            <i className="bi bi-pc-display me-1"></i> POS Machine Sync
-          </div>
-          <div className="bt-pos-status">
-            <span className="bt-dot" style={{ background: btStatusConfig.dot }}></span>
-            <span className={btStatusConfig.cls}>{btStatusConfig.label}</span>
-          </div>
-
-          {btStatus === 'error' && btError && (
-            <div className="bt-error-msg">{btError}</div>
-          )}
-
-          <div className="d-flex gap-1 mt-2">
+        {/* Cart Header */}
+        <div className="cart-header">
+          <i className="bi bi-receipt me-2"></i>Current Transaction
+          <div className="d-flex gap-1 ms-auto">
             {btStatus !== 'connected' ? (
               <button
-                className="btn btn-sm btn-primary w-100"
+                className="btn btn-sm btn-primary"
                 onClick={connectPosMachine}
                 disabled={btStatus === 'connecting'}
               >
                 {btStatus === 'connecting'
-                  ? <><span className="spinner-border spinner-border-sm me-1"></span>Connecting...</>
-                  : <><i className="bi bi-bluetooth me-1"></i>Connect POS Machine</>
+                  ? <><span className="spinner-border spinner-border-sm me-1"></span></>
+                  : <><i className="bi bi-bluetooth me-1"></i></>
                 }
+                Bluetooth
               </button>
             ) : (
-              <button className="btn btn-sm btn-outline-danger w-100" onClick={disconnectPosMachine}>
-                <i className="bi bi-bluetooth me-1"></i>Disconnect
+              <button className="btn btn-sm btn-outline-danger" onClick={disconnectPosMachine}>
+                <i className="bi bi-bluetooth me-1"></i>
+                Bluetooth
+              </button>
+            )}
+            {incomingCart.length > 0 && (
+              <button className="btn btn-link text-danger p-0 small" onClick={() => { setIncomingCart([]); setCashInput(''); }}>
+                <i className="bi bi-trash me-1"></i>Clear
               </button>
             )}
           </div>
-
-          {btStatus === 'connected' && (
-            <div className="bt-connected-hint">
-              <i className="bi bi-check-circle-fill text-success me-1"></i>
-              Waiting for transaction from POS machine...
-            </div>
-          )}
-        </div>
-
-        {/* Cart Header */}
-        <div className="cart-header">
-          <i className="bi bi-receipt me-2"></i>Current Transaction
-          {incomingCart.length > 0 && (
-            <button className="btn btn-link text-danger p-0 ms-auto small" onClick={() => { setIncomingCart([]); setCashInput(''); }}>
-              <i className="bi bi-trash me-1"></i>Clear
-            </button>
-          )}
         </div>
 
         {/* Cart Items */}
@@ -411,16 +392,7 @@ export default function POS({ products, setProducts, transactions, setTransactio
               onChange={e => setCashInput(e.target.value)}
               min="0"
             />
-            <div className="d-flex gap-1 mt-1 flex-wrap">
-              {[20, 50, 100, 200, 500, 1000].map(amt => (
-                <button key={amt} className="btn btn-outline-secondary btn-sm flex-fill" onClick={() => handleQuickCash(amt)}>
-                  ₱{amt}
-                </button>
-              ))}
-              <button className="btn btn-outline-secondary btn-sm flex-fill" onClick={() => handleQuickCash(subtotal)}>
-                Exact
-              </button>
-            </div>
+
           </div>
 
           {cashInput && (
@@ -518,6 +490,7 @@ export default function POS({ products, setProducts, transactions, setTransactio
     cfg = cfg || getCatConfig(product.category, categories);
     const isLow = product.stock > 0 && product.stock <= product.lowStockAlert;
     const isOut = product.stock <= 0;
+    const productName = product.name.replace(/ *\([^)]*\) */g, " ");
     return (
       <div
         key={product.id}
@@ -525,7 +498,7 @@ export default function POS({ products, setProducts, transactions, setTransactio
         title={product.name}
       >
         <div className="pcr-emoji">{cfg.emoji}</div>
-        <div className="pcr-name">{product.name}</div>
+        <div className="pcr-name">{productName}</div>
         <div className="pcr-price">₱{product.price}</div>
         <div className="pcr-unit text-muted">/{product.unit}</div>
         {isOut ? (
