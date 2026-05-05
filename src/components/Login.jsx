@@ -1,25 +1,30 @@
 import { useState } from 'react';
 
-export default function Login({ onLogin, users }) {
+const DEMO_USERS = [
+  { label: 'Owner',   icon: 'bi-shield-fill-check', color: 'danger',  username: 'owner',    password: 'owner123' },
+  { label: 'Admin',   icon: 'bi-person-badge-fill', color: 'warning', username: 'admin',    password: 'admin123' },
+  { label: 'Cashier', icon: 'bi-cash-coin',         color: 'success', username: 'cashier1', password: 'cashier123' },
+];
+
+export default function Login({ onLogin, loading, error }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [showPass, setShowPass] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const user = users.find(u => u.username === username && u.password === password && u.active);
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('Invalid username or password. Please try again.');
-      setTimeout(() => setError(''), 3000);
+    setFormError('');
+    try {
+      await onLogin(username, password);
+    } catch (err) {
+      setFormError(err.message || 'Invalid username or password. Please try again.');
     }
   };
 
-  const quickLogin = (u) => {
-    setUsername(u.username);
-    setPassword(u.password);
+  const quickLogin = (demo) => {
+    setUsername(demo.username);
+    setPassword(demo.password);
   };
 
   return (
@@ -36,10 +41,10 @@ export default function Login({ onLogin, users }) {
 
         {/* Form */}
         <form onSubmit={handleLogin} autoComplete="off">
-          {error && (
+          {(formError || error) && (
             <div className="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
               <i className="bi bi-exclamation-circle-fill"></i>
-              <small>{error}</small>
+              <small>{formError || error}</small>
             </div>
           )}
           <div className="mb-3">
@@ -78,8 +83,11 @@ export default function Login({ onLogin, users }) {
               </button>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary w-100 login-btn">
-            <i className="bi bi-box-arrow-in-right me-2"></i>Sign In
+          <button type="submit" className="btn btn-primary w-100 login-btn" disabled={loading}>
+            {loading
+              ? <><span className="spinner-border spinner-border-sm me-2"></span>Signing in...</>
+              : <><i className="bi bi-box-arrow-in-right me-2"></i>Sign In</>
+            }
           </button>
         </form>
 
@@ -87,19 +95,16 @@ export default function Login({ onLogin, users }) {
         <div className="mt-4">
           <p className="text-center text-muted small mb-2">— Quick Login (Demo) —</p>
           <div className="row g-2">
-            {[
-              { label: 'Owner', icon: 'bi-shield-fill-check', color: 'danger', u: users[0] },
-              { label: 'Admin', icon: 'bi-person-badge-fill', color: 'warning', u: users[1] },
-              { label: 'Cashier', icon: 'bi-cash-coin', color: 'success', u: users[2] },
-            ].map(({ label, icon, color, u }) => (
-              <div className="col-4" key={label}>
+            {DEMO_USERS.map((demo) => (
+              <div className="col-4" key={demo.label}>
                 <button
                   type="button"
-                  className={`btn btn-outline-${color} btn-sm w-100 quick-btn`}
-                  onClick={() => quickLogin(u)}
+                  className={`btn btn-outline-${demo.color} btn-sm w-100 quick-btn`}
+                  onClick={() => quickLogin(demo)}
+                  disabled={loading}
                 >
-                  <i className={`bi ${icon} d-block mb-1`}></i>
-                  <small>{label}</small>
+                  <i className={`bi ${demo.icon} d-block mb-1`}></i>
+                  <small>{demo.label}</small>
                 </button>
               </div>
             ))}

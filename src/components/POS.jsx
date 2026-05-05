@@ -34,9 +34,10 @@ const POS_BLE_PROFILES = [
   { service: '0000ff00-0000-1000-8000-00805f9b34fb', characteristic: '0000ff02-0000-1000-8000-00805f9b34fb' },
 ];
 
-export default function POS({ products, setProducts, transactions, setTransactions, currentUser, categories }) {
+export default function POS({ products, currentUser, categories, onCreateTransaction }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState(null);
 
   // Incoming transaction from POS machine (via Bluetooth or manual confirm)
   const [incomingCart, setIncomingCart] = useState([]);
@@ -45,6 +46,7 @@ export default function POS({ products, setProducts, transactions, setTransactio
   const [lastTxn, setLastTxn]           = useState(null);
   const [printStatus, setPrintStatus]   = useState('');
   const [isPrinting, setIsPrinting]     = useState(false);
+  const [processError, setProcessError] = useState('');
 
   // Bluetooth POS device state
   const [btStatus, setBtStatus]   = useState('disconnected'); // disconnected | connecting | connected | error
@@ -172,32 +174,57 @@ export default function POS({ products, setProducts, transactions, setTransactio
 
   const removeItem = (idx) => setIncomingCart(prev => prev.filter((_, i) => i !== idx));
 
-  const handleProcess = () => {
+  const handleAddProduct = (product) => {
+    if (product.stock <= 0) {
+      setProcessError('Out of stock.');
+      return;
+    }
+
+    setProcessError('');
+    setIncomingCart(prev => {
+      const idx = prev.findIndex(i => i.name === product.name);
+      if (idx >= 0) {
+        const nextQty = prev[idx].qty + 1;
+        if (nextQty > product.stock) {
+          setProcessError('Not enough stock for this item.');
+          return prev;
+        }
+        const next = [...prev];
+        next[idx] = {
+          ...next[idx],
+          qty: nextQty,
+          total: Number((nextQty * product.price).toFixed(2)),
+        };
+        return next;
+      }
+      return [...prev, {
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        qty: 1,
+        total: Number(product.price),
+      }];
+    });
+  };
+
+  const handleProcess = async () => {
     if (incomingCart.length === 0 || cash < subtotal) return;
-
-    const now     = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().slice(0, 5);
-    const txnId   = `TXN-${dateStr.replace(/-/g, '')}-${String(transactions.length + 1).padStart(4, '0')}`;
-
-    const txn = {
-      id: txnId, date: dateStr, time: timeStr,
-      cashierId: currentUser.id, cashierName: currentUser.name,
-      items: incomingCart.map(i => ({ ...i })),
-      subtotal, cash, change,
-    };
-
-    // Deduct stock for matched products by name
-    setProducts(prev => prev.map(p => {
-      const cartItem = incomingCart.find(i => i.name === p.name);
-      return cartItem ? { ...p, stock: Math.max(0, p.stock - cartItem.qty) } : p;
-    }));
-
-    setTransactions(prev => [...prev, txn]);
-    setLastTxn(txn);
-    setShowReceipt(true);
-    setIncomingCart([]);
-    setCashInput('');
+    setPrintStatus('');
+    setProcessError('');
+    try {
+      const txn = await onCreateTransaction({
+        items: incomingCart.map(i => ({ ...i })),
+        cash,
+        change,
+        cashierId: currentUser.id,
+      });
+      setLastTxn(txn);
+      setShowReceipt(true);
+      setIncomingCart([]);
+      setCashInput('');
+    } catch (err) {
+      setProcessError(err.message || 'Failed to process transaction.');
+    }
   };
 
   const handlePrintBT = async () => {
@@ -344,6 +371,12 @@ export default function POS({ products, setProducts, transactions, setTransactio
             )}
           </div>
         </div>
+
+        {processError && (
+          <div className="alert alert-danger py-2 small mt-2">
+            <i className="bi bi-exclamation-circle me-1"></i>{processError}
+          </div>
+        )}
 
         {/* Cart Items */}
         <div className="cart-items">
@@ -494,8 +527,24 @@ export default function POS({ products, setProducts, transactions, setTransactio
     return (
       <div
         key={product.id}
-        className={`product-card-ref ${isOut ? 'out-of-stock' : ''} ${isLow ? 'low-stock' : ''}`}
+        className={`product-card-ref ${isOut ? 'out-of-stock' : ''} ${isLow ? 'low-stock' : ''} ${selectedProductId === product.id ? 'selected' : ''}`}
         title={product.name}
+        role="button"
+        tabIndex={isOut ? -1 : 0}
+        aria-disabled={isOut}
+        onClick={() => {
+          if (!isOut) {
+            setSelectedProductId(product.id);
+            handleAddProduct(product);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (isOut) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            setSelectedProductId(product.id);
+            handleAddProduct(product);
+          }
+        }}
       >
         <div className="pcr-emoji">{cfg.emoji}</div>
         <div className="pcr-name">{productName}</div>

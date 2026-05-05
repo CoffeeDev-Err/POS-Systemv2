@@ -1,14 +1,12 @@
 import { useState } from 'react';
 
-export default function Inventory({ products, setProducts, transactions }) {
+export default function Inventory({ products, categories, stockMovements, onStockIn }) {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [showStockIn, setShowStockIn] = useState(false);
   const [stockInForm, setStockInForm] = useState({ productId: '', qty: '', note: '' });
-  const [stockHistory, setStockHistory] = useState([
-    { id: 1, productId: 1, product: 'Itlog (per piraso)', type: 'stock-in', qty: 200, note: 'Delivery', date: new Date().toISOString().split('T')[0], time: '07:30' },
-    { id: 2, productId: 3, product: 'Mantika 250ml', type: 'stock-in', qty: 24, note: 'Delivery', date: new Date().toISOString().split('T')[0], time: '07:45' },
-  ]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const lowStock = products.filter(p => p.stock <= p.lowStockAlert);
   const outOfStock = products.filter(p => p.stock === 0);
@@ -19,29 +17,26 @@ export default function Inventory({ products, setProducts, transactions }) {
     return cat && s;
   });
 
-  const handleStockIn = () => {
+  const handleStockIn = async () => {
     const product = products.find(p => p.id === parseInt(stockInForm.productId));
     if (!product || !stockInForm.qty) return;
-    const qty = parseInt(stockInForm.qty);
 
-    setProducts(prev => prev.map(p =>
-      p.id === product.id ? { ...p, stock: p.stock + qty } : p
-    ));
+    setSaving(true);
+    setError('');
 
-    const now = new Date();
-    setStockHistory(prev => [...prev, {
-      id: prev.length + 1,
-      productId: product.id,
-      product: product.name,
-      type: 'stock-in',
-      qty,
-      note: stockInForm.note || 'Manual stock-in',
-      date: now.toISOString().split('T')[0],
-      time: now.toTimeString().slice(0, 5),
-    }]);
-
-    setStockInForm({ productId: '', qty: '', note: '' });
-    setShowStockIn(false);
+    try {
+      await onStockIn({
+        productId: product.id,
+        qty: parseInt(stockInForm.qty),
+        note: stockInForm.note || 'Manual stock-in',
+      });
+      setStockInForm({ productId: '', qty: '', note: '' });
+      setShowStockIn(false);
+    } catch (err) {
+      setError(err.message || 'Failed to stock in.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getStockStatus = (p) => {
@@ -75,9 +70,7 @@ export default function Inventory({ products, setProducts, transactions }) {
           </div>
           <select className="form-select" style={{ maxWidth: 160 }} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
             <option value="All">All Categories</option>
-            <option>Eggs</option>
-            <option>Mantika</option>
-            <option>Daily Needs</option>
+            {categories.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
         <button className="btn btn-dark" onClick={() => setShowStockIn(true)}>
@@ -155,20 +148,20 @@ export default function Inventory({ products, setProducts, transactions }) {
             </div>
             <div className="card-body p-0">
               <ul className="list-group list-group-flush">
-                {stockHistory.slice().reverse().map(h => (
+                {(stockMovements || []).slice().reverse().map(h => (
                   <li key={h.id} className="list-group-item py-2">
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
                         <div className="small fw-semibold">{h.product}</div>
-                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>{h.note} • {h.date} {h.time}</div>
+                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>{h.note || 'Stock movement'} • {h.date} {h.time}</div>
                       </div>
-                      <span className={`badge ${h.type === 'stock-in' ? 'bg-success' : 'bg-warning text-dark'}`}>
-                        +{h.qty}
+                      <span className={`badge ${h.type === 'stock-in' ? 'bg-success' : h.type === 'sale' ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                        {h.type === 'stock-in' ? '+' : '-'}{h.qty}
                       </span>
                     </div>
                   </li>
                 ))}
-                {stockHistory.length === 0 && (
+                {(!stockMovements || stockMovements.length === 0) && (
                   <li className="list-group-item text-center text-muted py-3 small">No stock activity yet</li>
                 )}
               </ul>
@@ -187,6 +180,11 @@ export default function Inventory({ products, setProducts, transactions }) {
                 <button className="btn-close" onClick={() => setShowStockIn(false)}></button>
               </div>
               <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger py-2 small">
+                    <i className="bi bi-exclamation-circle me-1"></i>{error}
+                  </div>
+                )}
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Select Product *</label>
                   <select className="form-select" value={stockInForm.productId} onChange={e => setStockInForm({ ...stockInForm, productId: e.target.value })}>
@@ -216,8 +214,11 @@ export default function Inventory({ products, setProducts, transactions }) {
               </div>
               <div className="modal-footer">
                 <button className="btn btn-outline-secondary" onClick={() => setShowStockIn(false)}>Cancel</button>
-                <button className="btn btn-dark" onClick={handleStockIn} disabled={!stockInForm.productId || !stockInForm.qty}>
-                  <i className="bi bi-check2 me-2"></i>Confirm Stock In
+                <button className="btn btn-dark" onClick={handleStockIn} disabled={saving || !stockInForm.productId || !stockInForm.qty}>
+                  {saving
+                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    : <><i className="bi bi-check2 me-2"></i>Confirm Stock In</>
+                  }
                 </button>
               </div>
             </div>

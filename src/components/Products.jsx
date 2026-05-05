@@ -1,14 +1,24 @@
 import { useState } from 'react';
 
-const EMPTY = { name: '', category: '', price: '', unit: 'pc', stock: '', lowStockAlert: '' };
+const EMPTY = { name: '', category: '', price: '', cost: '', unit: 'pc', stock: '', lowStockAlert: '' };
 
-export default function Products({ products, setProducts, categories, setCategories }) {
-  const [search, setSearch]         = useState('');
-  const [catFilter, setCatFilter]   = useState('All');
-  const [showModal, setShowModal]   = useState(false);
+export default function Products({
+  products,
+  categories,
+  onCreateProduct,
+  onUpdateProduct,
+  onDeleteProduct,
+  onCreateCategory,
+  onDeleteCategory,
+}) {
+  const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('All');
+  const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
-  const [form, setForm]             = useState({ ...EMPTY, category: categories[0] || '' });
-  const [deleteId, setDeleteId]     = useState(null);
+  const [form, setForm] = useState({ ...EMPTY, category: categories[0] || '' });
+  const [deleteId, setDeleteId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   // New-category creation inside the form
   const [newCatMode, setNewCatMode] = useState(false);
@@ -16,12 +26,12 @@ export default function Products({ products, setProducts, categories, setCategor
 
   // Derived emoji per category (simple palette)
   const CAT_EMOJIS = { Eggs: '🥚', Mantika: '🫙', 'Daily Needs': '🛍️' };
-  const FALLBACK_EMOJIS = ['📦','🏪','🧴','🥫','🧃','🍬'];
+  const FALLBACK_EMOJIS = ['📦', '🏪', '🧴', '🥫', '🧃', '🍬'];
   const getCatEmoji = (cat) => CAT_EMOJIS[cat] || FALLBACK_EMOJIS[categories.indexOf(cat) % FALLBACK_EMOJIS.length] || '📦';
 
   const filtered = products.filter(p => {
     const cat = catFilter === 'All' || p.category === catFilter;
-    const s   = p.name.toLowerCase().includes(search.toLowerCase());
+    const s = p.name.toLowerCase().includes(search.toLowerCase());
     return cat && s;
   });
 
@@ -30,58 +40,101 @@ export default function Products({ products, setProducts, categories, setCategor
     setEditProduct(null);
     setNewCatMode(false);
     setNewCatInput('');
+    setError('');
     setShowModal(true);
   };
 
   const openEdit = (p) => {
-    setForm({ ...p, price: String(p.price), stock: String(p.stock), lowStockAlert: String(p.lowStockAlert) });
+    setForm({
+      ...p,
+      price: String(p.price),
+      cost: String(p.cost ?? ''),
+      stock: String(p.stock),
+      lowStockAlert: String(p.lowStockAlert),
+    });
     setEditProduct(p);
     setNewCatMode(false);
     setNewCatInput('');
+    setError('');
     setShowModal(true);
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const trimmed = newCatInput.trim();
     if (!trimmed || categories.includes(trimmed)) return;
-    setCategories(prev => [...prev, trimmed]);
-    setForm(f => ({ ...f, category: trimmed }));
-    setNewCatMode(false);
-    setNewCatInput('');
-  };
 
-  const handleSave = () => {
-    if (!form.name || !form.price || !form.stock || !form.category) return;
-    if (editProduct) {
-      setProducts(prev => prev.map(p => p.id === editProduct.id
-        ? { ...p, ...form, price: parseFloat(form.price), stock: parseInt(form.stock), lowStockAlert: parseInt(form.lowStockAlert) || 0 }
-        : p
-      ));
-    } else {
-      const newId = Math.max(0, ...products.map(p => p.id)) + 1;
-      setProducts(prev => [...prev, {
-        ...form, id: newId,
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock),
-        lowStockAlert: parseInt(form.lowStockAlert) || 0,
-      }]);
+    setSaving(true);
+    setError('');
+    try {
+      await onCreateCategory(trimmed);
+      setForm(f => ({ ...f, category: trimmed }));
+      setNewCatMode(false);
+      setNewCatInput('');
+    } catch (err) {
+      setError(err.message || 'Failed to add category.');
+    } finally {
+      setSaving(false);
     }
-    setShowModal(false);
   };
 
-  const handleDelete = () => {
-    setProducts(prev => prev.filter(p => p.id !== deleteId));
-    setDeleteId(null);
+  const handleSave = async () => {
+    if (!form.name || !form.price || !form.stock || !form.category) return;
+
+    setSaving(true);
+    setError('');
+
+    const payload = {
+      ...form,
+      price: parseFloat(form.price),
+      cost: parseFloat(form.cost) || 0,
+      stock: parseInt(form.stock),
+      lowStockAlert: parseInt(form.lowStockAlert) || 0,
+    };
+
+    try {
+      if (editProduct) {
+        await onUpdateProduct(editProduct.id, payload);
+      } else {
+        await onCreateProduct(payload);
+      }
+      setShowModal(false);
+    } catch (err) {
+      setError(err.message || 'Failed to save product.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteCategory = (cat) => {
+  const handleDelete = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await onDeleteProduct(deleteId);
+      setDeleteId(null);
+    } catch (err) {
+      setError(err.message || 'Failed to delete product.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
     const inUse = products.some(p => p.category === cat);
     if (inUse) {
       alert(`Cannot delete "${cat}" — it still has products assigned to it. Reassign those products first.`);
       return;
     }
-    setCategories(prev => prev.filter(c => c !== cat));
-    if (catFilter === cat) setCatFilter('All');
+
+    setSaving(true);
+    setError('');
+    try {
+      await onDeleteCategory(cat);
+      if (catFilter === cat) setCatFilter('All');
+    } catch (err) {
+      setError(err.message || 'Failed to delete category.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -159,6 +212,7 @@ export default function Products({ products, setProducts, categories, setCategor
                 <th>Product</th>
                 <th>Category</th>
                 <th className="text-end">Price</th>
+                <th className="text-end">Cost</th>
                 <th className="text-center">Unit</th>
                 <th className="text-center">Stock</th>
                 <th className="text-center">Alert</th>
@@ -174,6 +228,7 @@ export default function Products({ products, setProducts, categories, setCategor
                   </td>
                   <td><span className="badge bg-light text-dark border">{p.category}</span></td>
                   <td className="text-end">₱{p.price.toFixed(2)}</td>
+                  <td className="text-end text-muted">₱{Number(p.cost || 0).toFixed(2)}</td>
                   <td className="text-center text-muted small">{p.unit}</td>
                   <td className="text-center">
                     <span className={`badge ${p.stock === 0 ? 'bg-danger' : p.stock <= p.lowStockAlert ? 'bg-warning text-dark' : 'bg-success'}`}>
@@ -194,7 +249,7 @@ export default function Products({ products, setProducts, categories, setCategor
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan="7" className="text-center text-muted py-4">No products found</td></tr>
+                <tr><td colSpan="8" className="text-center text-muted py-4">No products found</td></tr>
               )}
             </tbody>
           </table>
@@ -214,6 +269,11 @@ export default function Products({ products, setProducts, categories, setCategor
                 <button className="btn-close" onClick={() => setShowModal(false)}></button>
               </div>
               <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger py-2 small">
+                    <i className="bi bi-exclamation-circle me-1"></i>{error}
+                  </div>
+                )}
                 <div className="row g-3">
                   <div className="col-12">
                     <label className="form-label fw-semibold">Product Name *</label>
@@ -275,6 +335,10 @@ export default function Products({ products, setProducts, categories, setCategor
                     <input type="number" className="form-control" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="0.00" min="0" step="0.01" />
                   </div>
                   <div className="col-6">
+                    <label className="form-label fw-semibold">Cost (₱)</label>
+                    <input type="number" className="form-control" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} placeholder="0.00" min="0" step="0.01" />
+                  </div>
+                  <div className="col-6">
                     <label className="form-label fw-semibold">Current Stock *</label>
                     <input type="number" className="form-control" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} placeholder="0" min="0" />
                   </div>
@@ -289,9 +353,12 @@ export default function Products({ products, setProducts, categories, setCategor
                 <button
                   className="btn btn-dark"
                   onClick={handleSave}
-                  disabled={!form.name || !form.price || !form.stock || !form.category}
+                  disabled={saving || !form.name || !form.price || !form.stock || !form.category}
                 >
-                  <i className="bi bi-check2 me-2"></i>Save Product
+                  {saving
+                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    : <><i className="bi bi-check2 me-2"></i>Save Product</>
+                  }
                 </button>
               </div>
             </div>
@@ -311,8 +378,11 @@ export default function Products({ products, setProducts, categories, setCategor
               </div>
               <div className="modal-footer justify-content-center gap-2">
                 <button className="btn btn-outline-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
-                <button className="btn btn-danger" onClick={handleDelete}>
-                  <i className="bi bi-trash me-2"></i>Delete
+                <button className="btn btn-danger" onClick={handleDelete} disabled={saving}>
+                  {saving
+                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Deleting...</>
+                    : <><i className="bi bi-trash me-2"></i>Delete</>
+                  }
                 </button>
               </div>
             </div>

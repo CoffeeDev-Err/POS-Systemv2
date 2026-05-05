@@ -1,5 +1,7 @@
+import { toLocalDateString } from '../utils/date';
+
 export default function Dashboard({ products, transactions, currentUser }) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString();
   const todayTxns = transactions.filter(t => t.date === today);
   const todaySales = todayTxns.reduce((s, t) => s + t.subtotal, 0);
   const lowStock = products.filter(p => p.stock <= p.lowStockAlert);

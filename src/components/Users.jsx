@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { AUDIT_LOGS } from '../data/mockData';
 
 const ROLE_INFO = {
   superadmin: { label: 'Super Admin', color: 'danger', icon: 'bi-shield-fill-check' },
@@ -9,33 +8,51 @@ const ROLE_INFO = {
 
 const EMPTY_USER = { name: '', username: '', password: '', role: 'cashier', active: true };
 
-export default function Users({ users, setUsers, currentUser }) {
+export default function Users({ users, currentUser, auditLogs, onCreateUser, onUpdateUser, onUpdateUserStatus }) {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [form, setForm] = useState(EMPTY_USER);
   const [showPass, setShowPass] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
   const [toggleId, setToggleId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const displayUsers = users.filter(u => u.id !== currentUser.id);
+  const openAdd = () => { setForm(EMPTY_USER); setEditUser(null); setShowModal(true); setShowPass(true); setError(''); };
+  const openEdit = (u) => { setForm({ ...u }); setEditUser(u); setShowModal(true); setShowPass(false); setError(''); };
 
-  const openAdd = () => { setForm(EMPTY_USER); setEditUser(null); setShowModal(true); setShowPass(true); };
-  const openEdit = (u) => { setForm({ ...u }); setEditUser(u); setShowModal(true); setShowPass(false); };
-
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.username || (!editUser && !form.password)) return;
-    if (editUser) {
-      setUsers(prev => prev.map(u => u.id === editUser.id ? { ...u, ...form } : u));
-    } else {
-      const newId = Math.max(...users.map(u => u.id)) + 1;
-      setUsers(prev => [...prev, { ...form, id: newId, createdAt: new Date().toISOString().split('T')[0] }]);
+    setSaving(true);
+    setError('');
+
+    try {
+      if (editUser) {
+        const payload = { ...form };
+        if (!payload.password) delete payload.password;
+        await onUpdateUser(editUser.id, payload);
+      } else {
+        await onCreateUser(form);
+      }
+      setShowModal(false);
+    } catch (err) {
+      setError(err.message || 'Failed to save user.');
+    } finally {
+      setSaving(false);
     }
-    setShowModal(false);
   };
 
-  const handleToggle = (id) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u));
-    setToggleId(null);
+  const handleToggle = async (id) => {
+    setSaving(true);
+    setError('');
+    try {
+      await onUpdateUserStatus(id);
+      setToggleId(null);
+    } catch (err) {
+      setError(err.message || 'Failed to update user.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -49,6 +66,12 @@ export default function Users({ users, setUsers, currentUser }) {
           <i className="bi bi-journal-text me-2"></i>Audit Logs
         </button>
       </div>
+
+      {error && (
+        <div className="alert alert-danger py-2 small mb-3">
+          <i className="bi bi-exclamation-circle me-1"></i>{error}
+        </div>
+      )}
 
       {activeTab === 'users' && (
         <>
@@ -152,7 +175,7 @@ export default function Users({ users, setUsers, currentUser }) {
                 <tr><th>#</th><th>User</th><th>Action</th><th>Timestamp</th></tr>
               </thead>
               <tbody>
-                {AUDIT_LOGS.slice().reverse().map(log => (
+                {(auditLogs || []).slice().reverse().map(log => (
                   <tr key={log.id}>
                     <td className="text-muted">{log.id}</td>
                     <td className="fw-semibold">{log.user}</td>
@@ -176,6 +199,11 @@ export default function Users({ users, setUsers, currentUser }) {
                 <button className="btn-close" onClick={() => setShowModal(false)}></button>
               </div>
               <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger py-2 small">
+                    <i className="bi bi-exclamation-circle me-1"></i>{error}
+                  </div>
+                )}
                 <div className="row g-3">
                   <div className="col-12">
                     <label className="form-label fw-semibold">Full Name *</label>
@@ -212,8 +240,11 @@ export default function Users({ users, setUsers, currentUser }) {
               </div>
               <div className="modal-footer">
                 <button className="btn btn-outline-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button className="btn btn-dark" onClick={handleSave} disabled={!form.name || !form.username || (!editUser && !form.password)}>
-                  <i className="bi bi-check2 me-2"></i>Save User
+                <button className="btn btn-dark" onClick={handleSave} disabled={saving || !form.name || !form.username || (!editUser && !form.password)}>
+                  {saving
+                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    : <><i className="bi bi-check2 me-2"></i>Save User</>
+                  }
                 </button>
               </div>
             </div>
@@ -234,7 +265,7 @@ export default function Users({ users, setUsers, currentUser }) {
               </div>
               <div className="modal-footer justify-content-center gap-2">
                 <button className="btn btn-outline-secondary" onClick={() => setToggleId(null)}>Cancel</button>
-                <button className="btn btn-dark" onClick={() => handleToggle(toggleId)}>Confirm</button>
+                <button className="btn btn-dark" onClick={() => handleToggle(toggleId)} disabled={saving}>Confirm</button>
               </div>
             </div>
           </div>

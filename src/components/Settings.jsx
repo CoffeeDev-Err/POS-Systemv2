@@ -1,17 +1,43 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-export default function Settings() {
+export default function Settings({ settings, onSaveSettings }) {
   const [store, setStore] = useState({
-    name: "CARREN'S STORE",
-    address: 'Urdaneta, Ilocos',
-    phone: '09XX-XXX-XXXX',
-    receiptFooter: 'Salamat sa inyong pagbili! Please come again :)',
+    storeName: settings?.storeName || "CARREN'S STORE",
+    address: settings?.address || 'Urdaneta, Ilocos',
+    phone: settings?.phone || '09XX-XXX-XXXX',
+    receiptFooter: settings?.receiptFooter || 'Salamat sa inyong pagbili! Please come again :)',
   });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  useEffect(() => {
+    if (!settings) return;
+    setStore({
+      storeName: settings.storeName,
+      address: settings.address,
+      phone: settings.phone,
+      receiptFooter: settings.receiptFooter,
+    });
+  }, [settings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await onSaveSettings({
+        storeName: store.storeName,
+        address: store.address,
+        phone: store.phone,
+        receiptFooter: store.receiptFooter,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err.message || 'Failed to save settings.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -24,7 +50,7 @@ export default function Settings() {
             <div className="card-body">
               <div className="mb-3">
                 <label className="form-label fw-semibold">Store Name</label>
-                <input className="form-control" value={store.name} onChange={e => setStore({ ...store, name: e.target.value })} />
+                <input className="form-control" value={store.storeName} onChange={e => setStore({ ...store, storeName: e.target.value })} />
               </div>
               <div className="mb-3">
                 <label className="form-label fw-semibold">Address</label>
@@ -38,9 +64,13 @@ export default function Settings() {
                 <label className="form-label fw-semibold">Receipt Footer Message</label>
                 <textarea className="form-control" rows="2" value={store.receiptFooter} onChange={e => setStore({ ...store, receiptFooter: e.target.value })} />
               </div>
+              {error && <div className="alert alert-danger py-2 small"><i className="bi bi-exclamation-circle me-1"></i>{error}</div>}
               {saved && <div className="alert alert-success py-2 small"><i className="bi bi-check-circle me-1"></i>Settings saved successfully!</div>}
-              <button className="btn btn-dark" onClick={handleSave}>
-                <i className="bi bi-save me-2"></i>Save Settings
+              <button className="btn btn-dark" onClick={handleSave} disabled={saving}>
+                {saving
+                  ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                  : <><i className="bi bi-save me-2"></i>Save Settings</>
+                }
               </button>
             </div>
           </div>

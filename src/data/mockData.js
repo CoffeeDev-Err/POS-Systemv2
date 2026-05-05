@@ -1,6 +1,8 @@
+import { toLocalDateString } from '../utils/date';
+
 const today = new Date();
 const yd = new Date(today); yd.setDate(yd.getDate() - 1);
-const td = (d) => d.toISOString().split('T')[0];
+const td = (d) => toLocalDateString(d);
 
 export const USERS = [
   { id: 1, name: 'Carren Santos',   username: 'owner',    password: 'owner123',   role: 'superadmin', active: true, createdAt: '2025-01-01' },
