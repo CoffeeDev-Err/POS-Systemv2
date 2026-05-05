@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { getPool } = require('../config/db');
 const { formatDate } = require('../utils/format');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '12h';
 
 function mapUser(row) {
@@ -24,13 +25,22 @@ async function login(req, res, next) {
       return res.status(400).json({ message: 'Username and password are required.' });
     }
 
+    if (!JWT_SECRET) {
+      return res.status(500).json({ message: 'Server misconfigured: JWT_SECRET missing.' });
+    }
+
     const pool = getPool();
     const [rows] = await pool.query(
-      'SELECT id, name, username, role, active, created_at FROM users WHERE username = ? AND password = ? AND active = 1',
-      [username, password]
+      'SELECT id, name, username, password, role, active, created_at FROM users WHERE username = ? AND active = 1',
+      [username]
     );
 
     if (!rows.length) {
+      return res.status(401).json({ message: 'Invalid username or password.' });
+    }
+
+    const passwordOk = await bcrypt.compare(password, rows[0].password);
+    if (!passwordOk) {
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
 

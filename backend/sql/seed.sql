@@ -6,10 +6,10 @@ INSERT INTO categories (id, name) VALUES
   (3, 'Daily Needs');
 
 INSERT INTO users (id, name, username, password, role, active, created_at) VALUES
-  (1, 'Carren Santos', 'owner', 'owner123', 'superadmin', 1, '2025-01-01'),
-  (2, 'Maria Cruz', 'admin', 'admin123', 'admin', 1, '2025-01-05'),
-  (3, 'Juan Dela Cruz', 'cashier1', 'cashier123', 'cashier', 1, '2025-01-10'),
-  (4, 'Ana Reyes', 'cashier2', 'cashier456', 'cashier', 0, '2025-02-01');
+  (1, 'Carren Santos', 'owner', '$2b$10$Y2aHpI292FFn87lsDAkr1uLw227gwwwE6uhOQT6um4R50GD9PWEwq', 'superadmin', 1, '2025-01-01'),
+  (2, 'Maria Cruz', 'admin', '$2b$10$7M6fKB2xAZHao.kqT3Bx6.JTOduh7ot4ejvZhIB/fQm.L2FmnbJD2', 'admin', 1, '2025-01-05'),
+  (3, 'Juan Dela Cruz', 'cashier1', '$2b$10$L9MXjEqZc7BnTmAsegXIVezkVl9YUTnJMQDGi6c1Hn4mGYOA5yLoG', 'cashier', 1, '2025-01-10'),
+  (4, 'Ana Reyes', 'cashier2', '$2b$10$WGv4vRAYBUE8l1cq7j0EZu.nQX0wy7FYD6V1iSSzZChsaBCXzmcm2', 'cashier', 0, '2025-02-01');
 
 INSERT INTO products (id, name, category_id, price, cost, unit, stock, low_stock_alert, active, created_at) VALUES
   (1, 'Itlog (per piraso)', 1, 8.00, 5.00, 'pc', 360, 50, 1, '2025-01-01'),

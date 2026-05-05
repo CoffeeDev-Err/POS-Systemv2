@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { getPool } = require('../config/db');
 const { logAudit } = require('../utils/audit');
 const { formatDate } = require('../utils/format');
@@ -43,13 +44,15 @@ async function createUser(req, res, next) {
       return res.status(409).json({ message: 'Username already exists.' });
     }
 
+    const passwordHash = await bcrypt.hash(password, 10);
+
     const [result] = await pool.query(
       `INSERT INTO users (name, username, password, role, active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)` ,
       [
         name,
         username,
-        password,
+        passwordHash,
         role || 'cashier',
         active === false ? 0 : 1,
         formatDate(new Date()),
@@ -95,9 +98,10 @@ async function updateUser(req, res, next) {
     }
 
     if (password) {
+      const passwordHash = await bcrypt.hash(password, 10);
       await pool.query(
         `UPDATE users SET name = ?, username = ?, password = ?, role = ?, active = ? WHERE id = ?`,
-        [name, username, password, role, active === false ? 0 : 1, id]
+        [name, username, passwordHash, role, active === false ? 0 : 1, id]
       );
     } else {
       await pool.query(

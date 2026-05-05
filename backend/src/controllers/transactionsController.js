@@ -16,6 +16,15 @@ function mapTransactionRow(row, items) {
   };
 }
 
+function generateTxnId(now) {
+  const dateKey = formatDate(now).replace(/-/g, '');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `TXN-${dateKey}-${hh}${mm}${ss}-${rand}`;
+}
+
 async function listTransactions(req, res, next) {
   try {
     const pool = getPool();
@@ -103,16 +112,16 @@ async function createTransaction(req, res, next) {
   const conn = await pool.getConnection();
 
   try {
-    const { id, items, cash, change } = req.body;
+    const { id, items, cash } = req.body;
     const cashierId = req.body.cashierId || req.user.id;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Items are required.' });
     }
 
-    const invalidItem = items.find(item => !item.name || Number(item.qty || 0) <= 0);
+    const invalidItem = items.find(item => Number(item.qty || 0) <= 0 || (!item.productId && !item.name));
     if (invalidItem) {
-      return res.status(400).json({ message: 'Each item must have a name and quantity.' });
+      return res.status(400).json({ message: 'Each item must have a product and quantity.' });
     }
 
     const now = new Date();
@@ -121,82 +130,121 @@ async function createTransaction(req, res, next) {
 
     await conn.beginTransaction();
 
-    let txnId = id;
-    if (!txnId) {
-      const dateKey = date.replace(/-/g, '');
-      const [countRows] = await conn.query('SELECT COUNT(*) AS cnt FROM transactions WHERE date = ?', [date]);
-      const nextNum = Number(countRows[0].cnt) + 1;
-      txnId = `TXN-${dateKey}-${String(nextNum).padStart(4, '0')}`;
+    const requestedItems = items.map(item => ({
+      productId: item.productId ? Number(item.productId) : null,
+      name: String(item.name || '').trim(),
+      qty: Number(item.qty || 0),
+    }));
+
+    const idList = Array.from(new Set(requestedItems.filter(i => i.productId).map(i => i.productId)));
+    const nameList = Array.from(new Set(requestedItems.filter(i => !i.productId && i.name).map(i => i.name)));
+    if (!idList.length && !nameList.length) {
+      return res.status(400).json({ message: 'No valid products in transaction.' });
     }
 
-    const normalizedItems = items.map(item => {
-      const qty = Number(item.qty || 0);
-      const price = Number(item.price || 0);
-      const total = Number(item.total || qty * price);
+    const whereParts = [];
+    const params = [];
+    if (idList.length) {
+      whereParts.push(`id IN (${idList.map(() => '?').join(',')})`);
+      params.push(...idList);
+    }
+    if (nameList.length) {
+      whereParts.push(`name IN (${nameList.map(() => '?').join(',')})`);
+      params.push(...nameList);
+    }
+
+    const [productRows] = await conn.query(
+      `SELECT id, name, price, cost, stock FROM products WHERE ${whereParts.join(' OR ')}`,
+      params
+    );
+
+    const productById = new Map(productRows.map(p => [p.id, p]));
+    const productByName = new Map(productRows.map(p => [p.name, p]));
+
+    const requiredQty = new Map();
+    const normalizedItems = requestedItems.map(item => {
+      const product = item.productId
+        ? productById.get(item.productId)
+        : productByName.get(item.name);
+
+      if (!product) {
+        const err = new Error(`Product not found: ${item.name || item.productId}`);
+        err.status = 400;
+        throw err;
+      }
+
+      const prevQty = requiredQty.get(product.id) || 0;
+      requiredQty.set(product.id, prevQty + item.qty);
+
+      const price = Number(product.price || 0);
+      const cost = Number(product.cost || 0);
+      const total = Number((price * item.qty).toFixed(2));
+      const costTotal = Number((cost * item.qty).toFixed(2));
+
       return {
-        productId: item.productId || null,
-        name: item.name,
-        qty,
+        productId: product.id,
+        name: product.name,
+        qty: item.qty,
         price,
         total,
-        cost: 0,
-        costTotal: 0,
+        cost,
+        costTotal,
       };
     });
 
+    for (const [productId, qty] of requiredQty.entries()) {
+      const product = productById.get(productId);
+      if (Number(product.stock) < qty) {
+        const err = new Error(`Insufficient stock for ${product.name}.`);
+        err.status = 400;
+        throw err;
+      }
+    }
+
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.total, 0);
     const cashValue = Number(cash || 0);
-    const changeValue = Number(change !== undefined ? change : cashValue - subtotal);
+    const changeValue = cashValue - subtotal;
 
     if (cashValue < subtotal) {
       await conn.rollback();
       return res.status(400).json({ message: 'Cash amount is less than subtotal.' });
     }
 
-    await conn.query(
-      `INSERT INTO transactions (id, date, time, cashier_id, subtotal, cash, change_amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [txnId, date, time, cashierId, subtotal, cashValue, changeValue]
-    );
+    let txnId = id;
+    let inserted = false;
+    let attempts = 0;
+
+    while (!inserted && attempts < 5) {
+      attempts += 1;
+      if (!txnId) txnId = generateTxnId(now);
+      try {
+        await conn.query(
+          `INSERT INTO transactions (id, date, time, cashier_id, subtotal, cash, change_amount)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [txnId, date, time, cashierId, subtotal, cashValue, changeValue]
+        );
+        inserted = true;
+      } catch (err) {
+        if (err && err.code === 'ER_DUP_ENTRY' && !id) {
+          txnId = null;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!inserted) {
+      throw new Error('Failed to generate transaction id.');
+    }
 
     const updatedProductIds = new Set();
 
     for (const item of normalizedItems) {
-      let productId = item.productId;
-      let itemCost = 0;
-
-      if (!productId && item.name) {
-        const [pRows] = await conn.query('SELECT id, stock, cost FROM products WHERE name = ? LIMIT 1', [item.name]);
-        if (pRows.length) {
-          productId = pRows[0].id;
-          const currentStock = Number(pRows[0].stock);
-          if (currentStock < item.qty) {
-            throw new Error(`Insufficient stock for ${item.name}.`);
-          }
-          itemCost = Number(pRows[0].cost || 0);
-          await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.qty, productId]);
-          updatedProductIds.add(productId);
-        }
-      } else if (productId) {
-        const [pRows] = await conn.query('SELECT stock, cost FROM products WHERE id = ? LIMIT 1', [productId]);
-        if (pRows.length) {
-          const currentStock = Number(pRows[0].stock);
-          if (currentStock < item.qty) {
-            throw new Error(`Insufficient stock for ${item.name}.`);
-          }
-          itemCost = Number(pRows[0].cost || 0);
-          await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.qty, productId]);
-          updatedProductIds.add(productId);
-        }
-      }
-
-      item.cost = itemCost;
-      item.costTotal = Number((itemCost * item.qty).toFixed(2));
-
+      const productId = item.productId;
       await conn.query(
         `INSERT INTO transaction_items (transaction_id, product_id, product_name, qty, price, cost, total, cost_total)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [txnId, productId || null, item.name, item.qty, item.price, item.cost, item.total, item.costTotal]
+        [txnId, productId, item.name, item.qty, item.price, item.cost, item.total, item.costTotal]
       );
 
       if (productId) {
@@ -206,6 +254,12 @@ async function createTransaction(req, res, next) {
           [productId, item.qty, `Sale ${txnId}`, date, time, cashierId]
         );
       }
+
+      updatedProductIds.add(productId);
+    }
+
+    for (const [productId, qty] of requiredQty.entries()) {
+      await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [qty, productId]);
     }
 
     let updatedProducts = [];

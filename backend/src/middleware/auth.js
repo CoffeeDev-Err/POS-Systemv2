@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { getPool } = require('../config/db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -10,6 +10,10 @@ async function requireAuth(req, res, next) {
   }
 
   const token = header.slice(7);
+
+  if (!JWT_SECRET) {
+    return res.status(500).json({ message: 'Server misconfigured: JWT_SECRET missing.' });
+  }
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
