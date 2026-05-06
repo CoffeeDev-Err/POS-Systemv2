@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -48,6 +48,14 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    const saved = localStorage.getItem('pos_theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  });
 
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -58,16 +66,16 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [settings, setSettings] = useState(EMPTY_SETTINGS);
 
-  const safeFetch = async (fn, fallback) => {
+  const safeFetch = useCallback(async (fn, fallback) => {
     try {
       return await fn();
     } catch (err) {
       if (err && err.status === 403) return fallback;
       throw err;
     }
-  };
+  }, []);
 
-  const loadData = async (role) => {
+  const loadData = useCallback(async (role) => {
     const canManage = role === 'superadmin' || role === 'admin';
     const isSuper = role === 'superadmin';
 
@@ -90,7 +98,7 @@ export default function App() {
     setUsers(results[5]);
     setSettings(results[6] || EMPTY_SETTINGS);
     setAuditLogs(results[7]);
-  };
+  }, [safeFetch]);
 
   useEffect(() => {
     const token = getAuthToken();
@@ -104,7 +112,7 @@ export default function App() {
         setCurrentUser(user);
         setCurrentPage(user.role === 'cashier' ? 'pos' : 'dashboard');
         await loadData(user.role);
-      } catch (err) {
+      } catch {
         clearAuthToken();
         localStorage.removeItem('pos_user');
         setCurrentUser(null);
@@ -114,7 +122,15 @@ export default function App() {
     };
 
     bootstrap();
-  }, []);
+  }, [loadData]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.dataset.theme = theme;
+    localStorage.setItem('pos_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
   const handleLogin = async (username, password) => {
     setLoading(true);
@@ -296,7 +312,7 @@ export default function App() {
   }, [currentUser]);
 
   if (!currentUser) {
-    return <Login onLogin={handleLogin} loading={loading} error={loadError} />;
+    return <Login onLogin={handleLogin} loading={loading} error={loadError} theme={theme} onToggleTheme={toggleTheme} />;
   }
 
   const renderPage = () => {
@@ -345,7 +361,14 @@ export default function App() {
   };
 
   return (
-    <Layout currentUser={currentUser} currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout}>
+    <Layout
+      currentUser={currentUser}
+      currentPage={currentPage}
+      setCurrentPage={setCurrentPage}
+      onLogout={handleLogout}
+      theme={theme}
+      onToggleTheme={toggleTheme}
+    >
       {loading && (
         <div className="alert alert-info small mb-3">Loading data...</div>
       )}

@@ -50,8 +50,6 @@ export default function POS({ products, currentUser, categories, onCreateTransac
 
   // Bluetooth POS device state
   const [btStatus, setBtStatus]   = useState('disconnected'); // disconnected | connecting | connected | error
-  const [btDeviceName, setBtDeviceName] = useState('');
-  const [btError, setBtError]     = useState('');
   const btDeviceRef = useRef(null);
   const btCharRef   = useRef(null);
   const rxBufferRef = useRef('');
@@ -77,13 +75,11 @@ export default function POS({ products, currentUser, categories, onCreateTransac
   ═══════════════════════════════════════════ */
   const connectPosMachine = async () => {
     if (!navigator.bluetooth) {
-      setBtError('Web Bluetooth is not available. Use Chrome or Edge on a secure context (localhost or HTTPS).');
       setBtStatus('error');
       return;
     }
 
     setBtStatus('connecting');
-    setBtError('');
 
     try {
       const device = await navigator.bluetooth.requestDevice({
@@ -92,11 +88,9 @@ export default function POS({ products, currentUser, categories, onCreateTransac
       });
 
       btDeviceRef.current = device;
-      setBtDeviceName(device.name || 'POS Machine');
 
       device.addEventListener('gattserverdisconnected', () => {
         setBtStatus('disconnected');
-        setBtDeviceName('');
         btCharRef.current = null;
       });
 
@@ -114,7 +108,6 @@ export default function POS({ products, currentUser, categories, onCreateTransac
       if (!characteristic) {
         device.gatt.disconnect();
         setBtStatus('error');
-        setBtError('No compatible BLE service found on this device.');
         return;
       }
 
@@ -136,9 +129,8 @@ export default function POS({ products, currentUser, categories, onCreateTransac
       });
 
       setBtStatus('connected');
-    } catch (err) {
+    } catch {
       setBtStatus('error');
-      setBtError(err.message);
     }
   };
 
@@ -147,7 +139,6 @@ export default function POS({ products, currentUser, categories, onCreateTransac
       btDeviceRef.current.gatt.disconnect();
     }
     setBtStatus('disconnected');
-    setBtDeviceName('');
     btCharRef.current = null;
   };
 
@@ -249,15 +240,6 @@ export default function POS({ products, currentUser, categories, onCreateTransac
       setIsPrinting(false);
     }
   };
-
-  const handleQuickCash = (amount) => setCashInput(String(amount));
-
-  const btStatusConfig = {
-    disconnected: { label: 'Not Connected',  cls: 'text-muted',   dot: '#6c757d' },
-    connecting:   { label: 'Connecting...',   cls: 'text-warning', dot: '#ffc107' },
-    connected:    { label: btDeviceName || 'Connected', cls: 'text-success', dot: '#198754' },
-    error:        { label: 'Connection Error', cls: 'text-danger',  dot: '#dc3545' },
-  }[btStatus];
 
   return (
     <div className="pos-layout">

@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { key: 'settings',  icon: 'bi-gear',            label: 'Settings',   roles: ['superadmin'] },
 ];
 
-export default function Layout({ children, currentUser, currentPage, setCurrentPage, onLogout }) {
+export default function Layout({ children, currentUser, currentPage, setCurrentPage, onLogout, theme, onToggleTheme }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const allowed = NAV_ITEMS.filter(n => n.roles.includes(currentUser.role));
@@ -84,6 +84,9 @@ export default function Layout({ children, currentUser, currentPage, setCurrentP
             {allowed.find(n => n.key === currentPage)?.label || 'Dashboard'}
           </div>
           <div className="header-right d-flex align-items-center gap-3">
+            <button className="btn btn-sm theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+              <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`}></i>
+            </button>
             <span className="d-none d-md-block text-muted small">
               <i className="bi bi-calendar3 me-1"></i>
               {new Date().toLocaleDateString('en-PH', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
@@ -96,7 +99,7 @@ export default function Layout({ children, currentUser, currentPage, setCurrentP
         </header>
 
         {/* Page content */}
-        <main className="page-content">
+        <main className="page-content page-transition" data-page={currentPage} key={currentPage}>
           {children}
         </main>
       </div>

@@ -43,7 +43,7 @@ async function requireAuth(req, res, next) {
     };
 
     return next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ message: 'Invalid auth token.' });
   }
 }

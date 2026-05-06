@@ -6,7 +6,7 @@ const DEMO_USERS = [
   { label: 'Cashier', icon: 'bi-cash-coin',         color: 'success', username: 'cashier1', password: 'cashier123' },
 ];
 
-export default function Login({ onLogin, loading, error }) {
+export default function Login({ onLogin, loading, error, theme, onToggleTheme }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
@@ -30,6 +30,9 @@ export default function Login({ onLogin, loading, error }) {
   return (
     <div className="login-page d-flex align-items-center justify-content-center min-vh-100">
       <div className="login-card">
+        <button type="button" className="theme-toggle login-theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+          <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`}></i>
+        </button>
         {/* Logo */}
         <div className="text-center mb-4">
           <div className="store-logo mb-2">
@@ -113,7 +116,7 @@ export default function Login({ onLogin, loading, error }) {
 
         <p className="text-center text-muted mt-4 mb-0" style={{ fontSize: '0.75rem' }}>
           <i className="bi bi-shield-lock me-1"></i>
-          Secure POS v1.0 — Sample / Demo Mode
+          Secure POS v1.0
         </p>
       </div>
     </div>
