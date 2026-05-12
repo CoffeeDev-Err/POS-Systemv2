@@ -9,17 +9,17 @@ const STORE_INFO = {
 
 // Known category visual config — fallback palette for custom categories
 const KNOWN_CONFIG = {
-  'Eggs':        { emoji: '', color: '#f59e0b' },
-  'Mantika':     { emoji: '', color: '#3b82f6' },
-  'Daily Needs': { emoji: '', color: '#10b981' },
+  'Eggs':        { color: '#f59e0b' },
+  'Mantika':     { color: '#3b82f6' },
+  'Daily Needs': { color: '#10b981' },
 };
 const PALETTE = [
-  { emoji: '', color: '#8b5cf6' },
-  { emoji: '', color: '#ef4444' },
-  { emoji: '', color: '#f97316' },
-  { emoji: '', color: '#06b6d4' },
-  { emoji: '', color: '#84cc16' },
-  { emoji: '', color: '#ec4899' },
+  { color: '#8b5cf6' },
+  { color: '#ef4444' },
+  { color: '#f97316' },
+  { color: '#06b6d4' },
+  { color: '#84cc16' },
+  { color: '#ec4899' },
 ];
 const getCatConfig = (cat, allCats) => {
   if (KNOWN_CONFIG[cat]) return KNOWN_CONFIG[cat];
@@ -274,10 +274,7 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                 className={`cat-tab ${activeCategory === cat ? 'active' : ''}`}
                 onClick={() => setActiveCategory(cat)}
               >
-                {cat === 'All'
-                  ? <i className="bi bi-grid me-1"></i>
-                  : <span className="me-1" style={{ fontSize: '0.85em' }}>{cfg.emoji}</span>
-                }
+                {cat === 'All' ? <i className="bi bi-grid me-1"></i> : null}
                 {cat}
               </button>
             );
@@ -297,7 +294,6 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                 return (
                   <div key={cat} className="category-group mb-3">
                     <div className="category-group-header" style={{ borderLeftColor: cfg.color }}>
-                      <span className="category-group-emoji">{cfg.emoji}</span>
                       <span className="category-group-name">{cat}</span>
                       <span className="category-group-count">{items.length}</span>
                     </div>
@@ -528,7 +524,6 @@ export default function POS({ products, currentUser, categories, onCreateTransac
           }
         }}
       >
-        <div className="pcr-emoji">{cfg.emoji}</div>
         <div className="pcr-name">{productName}</div>
         <div className="pcr-price">₱{product.price}</div>
         <div className="pcr-unit text-muted">/{product.unit}</div>

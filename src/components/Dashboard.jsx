@@ -1,5 +1,6 @@
 import { toLocalDateString } from '../utils/date';
 
+
 export default function Dashboard({ products, transactions, currentUser }) {
   const today = toLocalDateString();
   const todayTxns = transactions.filter(t => t.date === today);
@@ -51,7 +52,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
       <div className="row g-3">
         {/* Recent Transactions */}
         <div className="col-lg-7">
-          <div className="card card-custom h-100">
+          <div className="card-custom h-100">
             <div className="card-header-custom">
               <i className="bi bi-clock-history me-2"></i>Recent Transactions Today
             </div>
@@ -98,7 +99,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
         {/* Right column */}
         <div className="col-lg-5">
           {/* Low Stock Alerts */}
-          <div className="card card-custom mb-3">
+          <div className=" card-custom mb-3">
             <div className="card-header-custom text-danger">
               <i className="bi bi-exclamation-triangle-fill me-2"></i>Low Stock Alerts
               <span className="badge bg-danger ms-2">{lowStock.length}</span>
@@ -128,7 +129,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
           </div>
 
           {/* Top Selling */}
-          <div className="card card-custom">
+          <div className="card-custom">
             <div className="card-header-custom">
               <i className="bi bi-trophy me-2 text-warning"></i>Top Selling Items
             </div>

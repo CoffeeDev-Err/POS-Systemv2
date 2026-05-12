@@ -49,8 +49,8 @@ export {
   clearAuthToken,
 };
 
-export async function login(username, password) {
-  return request('/auth/login', { method: 'POST', body: { username, password } });
+export async function login(username, password, role) {
+  return request('/auth/login', { method: 'POST', body: { username, password, role } });
 }
 
 export async function fetchMe() {
@@ -81,9 +81,12 @@ export async function createCategory(name) {
   return request('/categories', { method: 'POST', body: { name } });
 }
 
-export async function deleteCategory(idOrName) {
+export async function deleteCategory(idOrName, options = {}) {
   const encoded = encodeURIComponent(idOrName);
-  return request(`/categories/${encoded}`, { method: 'DELETE' });
+  const params = new URLSearchParams();
+  if (options.deleteProducts) params.set('deleteProducts', 'true');
+  const qs = params.toString();
+  return request(`/categories/${encoded}${qs ? `?${qs}` : ''}`, { method: 'DELETE' });
 }
 
 export async function fetchUsers() {

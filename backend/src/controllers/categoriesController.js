@@ -1,11 +1,8 @@
-const { getPool } = require('../config/db');
-const { logAudit } = require('../utils/audit');
+const { categoryService } = require('../services');
 
 async function listCategories(req, res, next) {
   try {
-    const pool = getPool();
-    const [rows] = await pool.query('SELECT name FROM categories ORDER BY name');
-    const categories = rows.map(r => r.name);
+    const categories = await categoryService.listCategories();
     return res.json(categories);
   } catch (err) {
     return next(err);
@@ -14,20 +11,9 @@ async function listCategories(req, res, next) {
 
 async function createCategory(req, res, next) {
   try {
-    const name = String(req.body.name || '').trim();
-    if (!name) {
-      return res.status(400).json({ message: 'Category name is required.' });
-    }
-
-    const pool = getPool();
-    const [exists] = await pool.query('SELECT id FROM categories WHERE name = ? LIMIT 1', [name]);
-    if (exists.length) {
-      return res.status(200).json({ name });
-    }
-
-    await pool.query('INSERT INTO categories (name) VALUES (?)', [name]);
-    await logAudit(req.user.id, `Added category: ${name}`);
-    return res.status(201).json({ name });
+    const result = await categoryService.createCategory(req.body.name, req.user.id);
+    const status = result.created ? 201 : 200;
+    return res.status(status).json({ name: result.name });
   } catch (err) {
     return next(err);
   }
@@ -35,30 +21,11 @@ async function createCategory(req, res, next) {
 
 async function deleteCategory(req, res, next) {
   try {
-    const idOrName = req.params.id;
-    const pool = getPool();
-
-    let categoryRow = null;
-    if (/^\d+$/.test(idOrName)) {
-      const [rows] = await pool.query('SELECT id, name FROM categories WHERE id = ? LIMIT 1', [Number(idOrName)]);
-      categoryRow = rows[0];
-    } else {
-      const [rows] = await pool.query('SELECT id, name FROM categories WHERE name = ? LIMIT 1', [idOrName]);
-      categoryRow = rows[0];
-    }
-
-    if (!categoryRow) {
-      return res.status(404).json({ message: 'Category not found.' });
-    }
-
-    const [inUse] = await pool.query('SELECT COUNT(*) AS cnt FROM products WHERE category_id = ?', [categoryRow.id]);
-    if (Number(inUse[0].cnt) > 0) {
-      return res.status(409).json({ message: 'Cannot delete a category with products.' });
-    }
-
-    await pool.query('DELETE FROM categories WHERE id = ?', [categoryRow.id]);
-    await logAudit(req.user.id, `Deleted category: ${categoryRow.name}`);
-    return res.json({ message: 'Category deleted.' });
+    const result = await categoryService.deleteCategory(req.params.id, {
+      deleteProducts: String(req.query.deleteProducts || '').toLowerCase() === 'true',
+      userId: req.user.id,
+    });
+    return res.json(result);
   } catch (err) {
     return next(err);
   }

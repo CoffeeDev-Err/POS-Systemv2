@@ -1,0 +1,57 @@
+export default function ReportsFilters({
+  rangePreset,
+  onPresetChange,
+  fromDate,
+  toDate,
+  onFromChange,
+  onToChange,
+  onPrint,
+  onExport,
+}) {
+  return (
+    <div className="d-flex flex-wrap gap-2 mb-4 align-items-center justify-content-between">
+      <div className="d-flex gap-2 flex-wrap">
+        {[
+          { v: 'today', l: 'Today' },
+          { v: 'yesterday', l: 'Yesterday' },
+          { v: 'week', l: 'Last 7 Days' },
+          { v: 'month', l: 'This Month' },
+        ].map(({ v, l }) => (
+          <button
+            key={v}
+            className={`btn btn-sm ${rangePreset === v ? 'btn-dark' : 'btn-outline-secondary'}`}
+            onClick={() => onPresetChange(v)}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="d-flex gap-2 flex-wrap align-items-center">
+        <div className="d-flex align-items-center gap-2">
+          <label className="small text-muted">From</label>
+          <input
+            type="date"
+            className="form-control form-control-sm"
+            value={fromDate}
+            onChange={e => onFromChange(e.target.value)}
+          />
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <label className="small text-muted">To</label>
+          <input
+            type="date"
+            className="form-control form-control-sm"
+            value={toDate}
+            onChange={e => onToChange(e.target.value)}
+          />
+        </div>
+        <button className="btn btn-outline-dark" onClick={onPrint}>
+          <i className="bi bi-printer me-2"></i>Print A4 Report
+        </button>
+        <button className="btn btn-outline-secondary" onClick={onExport}>
+          <i className="bi bi-download me-2"></i>Export CSV
+        </button>
+      </div>
+    </div>
+  );
+}

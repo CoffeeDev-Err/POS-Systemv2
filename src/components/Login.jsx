@@ -1,9 +1,9 @@
 import { useState } from 'react';
 
-const DEMO_USERS = [
-  { label: 'Owner',   icon: 'bi-shield-fill-check', color: 'danger',  username: 'owner',    password: 'owner123' },
-  { label: 'Admin',   icon: 'bi-person-badge-fill', color: 'warning', username: 'admin',    password: 'admin123' },
-  { label: 'Cashier', icon: 'bi-cash-coin',         color: 'success', username: 'cashier1', password: 'cashier123' },
+const ROLE_OPTIONS = [
+  { label: 'Owner', icon: 'bi-shield-fill-check', color: 'danger', role: 'superadmin' },
+  { label: 'Admin', icon: 'bi-person-badge-fill', color: 'warning', role: 'admin' },
+  { label: 'Cashier', icon: 'bi-cash-coin', color: 'success', role: 'cashier' },
 ];
 
 export default function Login({ onLogin, loading, error, theme, onToggleTheme }) {
@@ -11,21 +11,23 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setFormError('');
+    if (!selectedRole) {
+      setFormError('Please select a role before signing in.');
+      return;
+    }
     try {
-      await onLogin(username, password);
+      await onLogin(username, password, selectedRole);
     } catch (err) {
       setFormError(err.message || 'Invalid username or password. Please try again.');
     }
   };
 
-  const quickLogin = (demo) => {
-    setUsername(demo.username);
-    setPassword(demo.password);
-  };
+  const selectedRoleLabel = ROLE_OPTIONS.find((option) => option.role === selectedRole)?.label;
 
   return (
     <div className="login-page d-flex align-items-center justify-content-center min-vh-100">
@@ -94,24 +96,33 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
           </button>
         </form>
 
-        {/* Quick login demo */}
+        {/* Role selection */}
         <div className="mt-4">
-          <p className="text-center text-muted small mb-2">— Quick Login (Demo) —</p>
+          <p className="text-center text-muted small mb-2">— Select Role —</p>
           <div className="row g-2">
-            {DEMO_USERS.map((demo) => (
-              <div className="col-4" key={demo.label}>
+            {ROLE_OPTIONS.map((role) => (
+              <div className="col-4" key={role.label}>
                 <button
                   type="button"
-                  className={`btn btn-outline-${demo.color} btn-sm w-100 quick-btn`}
-                  onClick={() => quickLogin(demo)}
+                  className={`role-btn border-${role.color} ${selectedRole === role.role ? 'role-btn-active' : ''}`}
+                  onClick={() => {
+                    setSelectedRole(role.role);
+                    setFormError('');
+                  }}
+                  aria-pressed={selectedRole === role.role}
                   disabled={loading}
                 >
-                  <i className={`bi ${demo.icon} d-block mb-1`}></i>
-                  <small>{demo.label}</small>
+                  <i className={`bi ${role.icon} d-block mb-1 text-${role.color}`}></i>
+                  <small className={`role-label text-${role.color}`}>{role.label}</small>
                 </button>
               </div>
             ))}
           </div>
+          {selectedRoleLabel && (
+            <p className="text-center text-muted small mt-2 mb-0">
+              Selected: <span className="fw-semibold">{selectedRoleLabel}</span>
+            </p>
+          )}
         </div>
 
         <p className="text-center text-muted mt-4 mb-0" style={{ fontSize: '0.75rem' }}>
