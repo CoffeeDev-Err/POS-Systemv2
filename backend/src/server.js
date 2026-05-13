@@ -11,9 +11,19 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || '*';
-const allowedOrigins = corsOrigin === '*'
+const devOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+];
+let allowedOrigins = corsOrigin === '*'
   ? '*'
   : corsOrigin.split(',').map(s => s.trim()).filter(Boolean);
+
+if (allowedOrigins !== '*' && process.env.NODE_ENV !== 'production') {
+  allowedOrigins = Array.from(new Set([...allowedOrigins, ...devOrigins]));
+}
 
 app.use(cors({
   origin: allowedOrigins,

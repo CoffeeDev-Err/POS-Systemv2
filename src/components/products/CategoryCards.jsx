@@ -23,6 +23,7 @@ export default function CategoryCards({ categories, products, catFilter, onSelec
                     className="btn btn-link p-0 text-danger"
                     style={{ fontSize: '0.65rem', lineHeight: 1 }}
                     title={`Delete "${cat}" category`}
+                    aria-label={`Delete ${cat} category`}
                     onClick={e => { e.stopPropagation(); onDeleteCategory(cat); }}
                   >
                     <i className="bi bi-x-circle-fill"></i>

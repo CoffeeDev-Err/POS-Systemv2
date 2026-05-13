@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../styles/login.css';
 
 const ROLE_OPTIONS = [
   { label: 'Owner', icon: 'bi-shield-fill-check', color: 'danger', role: 'superadmin' },
@@ -32,7 +33,13 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
   return (
     <div className="login-page d-flex align-items-center justify-content-center min-vh-100">
       <div className="login-card">
-        <button type="button" className="theme-toggle login-theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+        <button
+          type="button"
+          className="theme-toggle login-theme-toggle"
+          onClick={onToggleTheme}
+          title="Toggle theme"
+          aria-label="Toggle theme"
+        >
           <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`}></i>
         </button>
         {/* Logo */}
@@ -83,7 +90,12 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
                 onChange={e => setPassword(e.target.value)}
                 required
               />
-              <button type="button" className="input-group-text bg-light" onClick={() => setShowPass(!showPass)}>
+              <button
+                type="button"
+                className="input-group-text bg-light"
+                onClick={() => setShowPass(!showPass)}
+                aria-label={showPass ? 'Hide password' : 'Show password'}
+              >
                 <i className={`bi ${showPass ? 'bi-eye-slash' : 'bi-eye'} text-secondary`}></i>
               </button>
             </div>

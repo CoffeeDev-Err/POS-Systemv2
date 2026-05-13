@@ -177,7 +177,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title"><i className="bi bi-plus-circle me-2"></i>Stock In — Add Delivery</h5>
-                <button className="btn-close" onClick={() => setShowStockIn(false)}></button>
+                <button className="btn-close" onClick={() => setShowStockIn(false)} aria-label="Close"></button>
               </div>
               <div className="modal-body">
                 {error && (

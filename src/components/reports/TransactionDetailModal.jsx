@@ -1,3 +1,5 @@
+import '../../styles/receipt.css';
+
 export default function TransactionDetailModal({ txn, onClose, formatCurrency }) {
   if (!txn) return null;
 
@@ -7,7 +9,7 @@ export default function TransactionDetailModal({ txn, onClose, formatCurrency })
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title small"><i className="bi bi-receipt me-2"></i>{txn.id}</h5>
-            <button className="btn-close" onClick={onClose}></button>
+            <button className="btn-close" onClick={onClose} aria-label="Close"></button>
           </div>
           <div className="modal-body">
             <div className="receipt-preview">

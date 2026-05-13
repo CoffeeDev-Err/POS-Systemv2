@@ -31,7 +31,11 @@ export default function TransactionHistoryTable({
                 <td className="text-center">{txn.items.length}</td>
                 <td className="text-end fw-semibold text-success">{formatCurrency(txn.subtotal)}</td>
                 <td className="text-center">
-                  <button className="btn btn-outline-secondary btn-sm" onClick={() => onSelectTxn(txn)}>
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => onSelectTxn(txn)}
+                    aria-label={`View transaction ${txn.id}`}
+                  >
                     <i className="bi bi-eye"></i>
                   </button>
                 </td>

@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import '../styles/pos.css';
+import '../styles/receipt.css';
 import { printViaBluetooth } from '../utils/escpos';
 
 const STORE_INFO = {
@@ -266,19 +268,16 @@ export default function POS({ products, currentUser, categories, onCreateTransac
 
         {/* Category tabs */}
         <div className="category-tabs mb-2">
-          {catTabs.map(cat => {
-            const cfg = getCatConfig(cat, categories);
-            return (
-              <button
-                key={cat}
-                className={`cat-tab ${activeCategory === cat ? 'active' : ''}`}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {cat === 'All' ? <i className="bi bi-grid me-1"></i> : null}
-                {cat}
-              </button>
-            );
-          })}
+          {catTabs.map(cat => (
+            <button
+              key={cat}
+              className={`cat-tab ${activeCategory === cat ? 'active' : ''}`}
+              onClick={() => setActiveCategory(cat)}
+            >
+              {cat === 'All' ? <i className="bi bi-grid me-1"></i> : null}
+              {cat}
+            </button>
+          ))}
         </div>
 
         {/* Product grid */}
@@ -377,7 +376,11 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                 </div>
                 <div className="cart-item-controls">
                   <span className="cart-item-total">₱{item.total}</span>
-                  <button className="btn btn-link text-danger p-0 ms-1" onClick={() => removeItem(idx)}>
+                  <button
+                    className="btn btn-link text-danger p-0 ms-1"
+                    onClick={() => removeItem(idx)}
+                    aria-label={`Remove ${item.name}`}
+                  >
                     <i className="bi bi-x-circle-fill"></i>
                   </button>
                 </div>
@@ -435,7 +438,11 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                 <h5 className="modal-title">
                   <i className="bi bi-check-circle-fill me-2"></i>Transaction Complete!
                 </h5>
-                <button className="btn-close btn-close-white" onClick={() => setShowReceipt(false)}></button>
+                <button
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowReceipt(false)}
+                  aria-label="Close receipt"
+                ></button>
               </div>
               <div className="modal-body p-0">
                 <div className="receipt-preview">

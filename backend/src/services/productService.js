@@ -3,6 +3,7 @@ const { ApiError } = require('../utils/errors');
 const { logAudit } = require('../utils/audit');
 const categoryRepository = require('../repositories/categoryRepository');
 const productRepository = require('../repositories/productRepository');
+const stockMovementRepository = require('../repositories/stockMovementRepository');
 
 function mapProduct(row) {
   return {
@@ -99,7 +100,19 @@ async function deleteProduct(id, userId) {
     throw ApiError.notFound('Product not found.');
   }
 
-  await productRepository.deleteProduct(pool, id);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await stockMovementRepository.deleteByProductIds(conn, [id]);
+    await productRepository.deleteProduct(conn, id);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
   await logAudit(userId, `Deleted product: ${existing.name}`);
   return { message: 'Product deleted.' };
 }

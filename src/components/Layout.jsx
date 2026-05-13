@@ -77,14 +77,23 @@ export default function Layout({ children, currentUser, currentPage, setCurrentP
       <div className="main-wrapper">
         {/* Top header */}
         <header className="top-header">
-          <button className="btn btn-light btn-sm d-lg-none me-2" onClick={() => setSidebarOpen(true)}>
+          <button
+            className="btn btn-light btn-sm d-lg-none me-2"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
             <i className="bi bi-list fs-5"></i>
           </button>
           <div className="header-title">
             {allowed.find(n => n.key === currentPage)?.label || 'Dashboard'}
           </div>
           <div className="header-right d-flex align-items-center gap-3">
-            <button className="btn btn-sm theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+            <button
+              className="btn btn-sm theme-toggle"
+              onClick={onToggleTheme}
+              title="Toggle theme"
+              aria-label="Toggle theme"
+            >
               <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`}></i>
             </button>
             <span className="d-none d-md-block text-muted small">

@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import Login from './components/Login';
 import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import POS from './components/POS';
-import Products from './components/Products';
-import Inventory from './components/Inventory';
-import Reports from './components/Reports';
-import Users from './components/Users';
-import Settings from './components/Settings';
+import LoadingSkeleton from './components/LoadingSkeleton';
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const POS = lazy(() => import('./components/POS'));
+const Products = lazy(() => import('./components/Products'));
+const Inventory = lazy(() => import('./components/Inventory'));
+const Reports = lazy(() => import('./components/Reports'));
+const Users = lazy(() => import('./components/Users'));
+const Settings = lazy(() => import('./components/Settings'));
+
 import {
   login as apiLogin,
   fetchMe,
@@ -168,6 +170,16 @@ export default function App() {
     }
   };
 
+  const skeletonVariant = {
+    dashboard: 'dashboard',
+    pos: 'pos',
+    products: 'products',
+    inventory: 'inventory',
+    reports: 'reports',
+    users: 'users',
+    settings: 'settings',
+  }[currentPage] || 'page';
+
   return (
     <Layout
       currentUser={currentUser}
@@ -178,12 +190,14 @@ export default function App() {
       onToggleTheme={toggleTheme}
     >
       {loading && (
-        <div className="alert alert-info small mb-3">Loading data...</div>
+        <LoadingSkeleton variant="banner" />
       )}
       {loadError && (
         <div className="alert alert-danger small mb-3">{loadError}</div>
       )}
-      {renderPage()}
+      <Suspense fallback={<LoadingSkeleton variant={skeletonVariant} />}>
+        {renderPage()}
+      </Suspense>
     </Layout>
   );
 }

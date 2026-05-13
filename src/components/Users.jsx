@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../styles/users.css';
 
 const ROLE_INFO = {
   superadmin: { label: 'Super Admin', color: 'danger', icon: 'bi-shield-fill-check' },
@@ -143,7 +144,13 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                         <td className="text-muted small">{u.createdAt}</td>
                         <td className="text-center">
                           <div className="d-flex gap-1 justify-content-center">
-                            <button className="btn btn-outline-secondary btn-sm" onClick={() => openEdit(u)} disabled={isSelf} title="Edit">
+                            <button
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => openEdit(u)}
+                              disabled={isSelf}
+                              title="Edit"
+                              aria-label={`Edit ${u.name}`}
+                            >
                               <i className="bi bi-pencil"></i>
                             </button>
                             <button
@@ -151,6 +158,7 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                               onClick={() => setToggleId(u.id)}
                               disabled={isSelf}
                               title={u.active ? 'Deactivate' : 'Activate'}
+                              aria-label={`${u.active ? 'Deactivate' : 'Activate'} ${u.name}`}
                             >
                               <i className={`bi ${u.active ? 'bi-person-x' : 'bi-person-check'}`}></i>
                             </button>
@@ -196,7 +204,7 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title"><i className="bi bi-person-plus me-2"></i>{editUser ? 'Edit User' : 'Add New User'}</h5>
-                <button className="btn-close" onClick={() => setShowModal(false)}></button>
+                <button className="btn-close" onClick={() => setShowModal(false)} aria-label="Close"></button>
               </div>
               <div className="modal-body">
                 {error && (
@@ -225,7 +233,12 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                     <label className="form-label fw-semibold">{editUser ? 'New Password (leave blank to keep)' : 'Password *'}</label>
                     <div className="input-group">
                       <input type={showPass ? 'text' : 'password'} className="form-control" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={editUser ? 'Leave blank to keep current' : 'Enter password'} />
-                      <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPass(!showPass)}>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => setShowPass(!showPass)}
+                        aria-label={showPass ? 'Hide password' : 'Show password'}
+                      >
                         <i className={`bi ${showPass ? 'bi-eye-slash' : 'bi-eye'}`}></i>
                       </button>
                     </div>

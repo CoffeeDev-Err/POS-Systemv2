@@ -25,7 +25,7 @@ export default function ProductModal({
               <i className={`bi ${editProduct ? 'bi-pencil-square' : 'bi-plus-circle'} me-2`}></i>
               {editProduct ? 'Edit Product' : 'Add New Product'}
             </h5>
-            <button className="btn-close" onClick={onClose}></button>
+            <button className="btn-close" onClick={onClose} aria-label="Close"></button>
           </div>
           <div className="modal-body">
             {error && (
@@ -74,10 +74,20 @@ export default function ProductModal({
                       onChange={e => onNewCatInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && onAddCategory()}
                     />
-                    <button type="button" className="btn btn-success btn-sm flex-shrink-0" onClick={onAddCategory}>
+                    <button
+                      type="button"
+                      className="btn btn-success btn-sm flex-shrink-0"
+                      onClick={onAddCategory}
+                      aria-label="Create category"
+                    >
                       <i className="bi bi-check2"></i>
                     </button>
-                    <button type="button" className="btn btn-outline-secondary btn-sm flex-shrink-0" onClick={() => { onNewCatMode(false); onNewCatInput(''); }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm flex-shrink-0"
+                      onClick={() => { onNewCatMode(false); onNewCatInput(''); }}
+                      aria-label="Cancel new category"
+                    >
                       <i className="bi bi-x"></i>
                     </button>
                   </div>

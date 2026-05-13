@@ -11,8 +11,8 @@ import {
   ExpensesTable,
   TransactionDetailModal,
   ExpenseModal,
-  ReportsSkeleton,
 } from './reports/index';
+import LoadingSkeleton from './LoadingSkeleton';
 
 const peso = (value) => `₱${Number(value || 0).toLocaleString()}`;
 
@@ -205,7 +205,7 @@ export default function Reports({ transactions, products, expenses, currentUser,
       />
 
       {loading ? (
-        <ReportsSkeleton />
+        <LoadingSkeleton variant="reports" />
       ) : (
         <>
           <ReportsSummaryCards

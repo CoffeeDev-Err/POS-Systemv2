@@ -15,7 +15,7 @@ export default function ExpenseModal({
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title"><i className="bi bi-plus-circle me-2"></i>Add Expense</h5>
-            <button className="btn-close" onClick={onClose}></button>
+            <button className="btn-close" onClick={onClose} aria-label="Close"></button>
           </div>
           <div className="modal-body">
             {error && (
