@@ -76,7 +76,13 @@ export const fetchTransactions = () =>
 export async function createTransaction(payload) {
   // Normalize transaction shape: compute date, time, subtotal, and lookup cashierName
   const now = new Date();
-  const date = now.toISOString().slice(0, 10); // YYYY-MM-DD format
+  
+  // Use LOCAL timezone for date, not UTC
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const date = `${year}-${month}-${day}`; // YYYY-MM-DD format in local timezone
+  
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const time = `${hours}:${minutes}`; // HH:MM format
