@@ -65,6 +65,8 @@ export async function updateUser(id, payload) {
 
 export async function updateUserStatus(id, payload) {
   await updateDoc(doc(db, "users", id), payload);
+  const snap = await getDoc(doc(db, "users", id));
+  return { id, ...serialize(snap.data()) };
 }
 
 // --- transactions (also deducts stock for each item sold) ---
