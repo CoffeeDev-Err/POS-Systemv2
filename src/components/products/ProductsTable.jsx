@@ -1,10 +1,33 @@
+import { useState } from 'react';
+
 export default function ProductsTable({ products, onEdit, onDelete }) {
+  const [pageSize, setPageSize] = useState(25);
+  
+  const displayedProducts = pageSize === 'all' ? products : products.slice(0, pageSize);
+  
   return (
-    <div className=" card-custom">
-      <div className="card-header-custom">
-        <i className="bi bi-box-seam me-2"></i>Products ({products.length})
+    <div className="card-custom">
+      <div className="card-header-custom d-flex justify-content-between align-items-center">
+        <span>
+          <i className="bi bi-box-seam me-2"></i>Products ({products.length})
+        </span>
+        <div className="table-page-size-control">
+          <span className="text-muted small me-2">Show</span>
+          <select
+            className="form-select form-select-sm d-inline-block"
+            style={{ maxWidth: '70px' }}
+            value={pageSize}
+            onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value="all">All</option>
+          </select>
+          <span className="text-muted small ms-2">rows</span>
+        </div>
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive table-scroll-panel table-scroll-panel--products">
         <table className="table table-hover mb-0 align-middle">
           <thead className="table-light">
             <tr>
@@ -19,7 +42,7 @@ export default function ProductsTable({ products, onEdit, onDelete }) {
             </tr>
           </thead>
           <tbody>
-            {products.map(p => (
+            {displayedProducts.map(p => (
               <tr key={p.id}>
                 <td>
                   <span className="fw-semibold">{p.name}</span>
@@ -51,6 +74,9 @@ export default function ProductsTable({ products, onEdit, onDelete }) {
             )}
           </tbody>
         </table>
+      </div>
+      <div className="table-footer-meta text-muted small p-3 border-top">
+        Showing {displayedProducts.length} of {products.length} {products.length === 1 ? 'product' : 'products'}
       </div>
     </div>
   );

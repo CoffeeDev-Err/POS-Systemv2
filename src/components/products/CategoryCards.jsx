@@ -8,7 +8,7 @@ export default function CategoryCards({ categories, products, catFilter, onSelec
         return (
           <div className="col-6 col-md-3" key={cat}>
             <div
-              className={`card text-center py-2 ${catFilter === cat ? 'border-dark border-2' : 'border'}`}
+              className={`card text-center py-2 border-0 shadow-sm ${catFilter === cat ? 'shadow' : ''}`}
               onClick={() => onSelectCategory(cat)}
               style={{ cursor: 'pointer' }}
             >

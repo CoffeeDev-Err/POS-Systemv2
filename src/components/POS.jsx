@@ -297,7 +297,7 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                       <span className="category-group-count">{items.length}</span>
                     </div>
                     <div className="product-grid">
-                      {items.map(p => renderCard(p, getCatConfig(p.category, categories)))}
+                      {items.map(p => renderCard(p))}
                     </div>
                   </div>
                 );
@@ -305,7 +305,7 @@ export default function POS({ products, currentUser, categories, onCreateTransac
             )
           ) : (
             <div className="product-grid">
-              {filtered.map(p => renderCard(p, getCatConfig(p.category, categories)))}
+              {filtered.map(p => renderCard(p))}
               {filtered.length === 0 && (
                 <div className="col-span-all text-center text-muted py-4 small">
                   <i className="bi bi-box-seam fs-2 d-block mb-2"></i>No items
@@ -504,8 +504,7 @@ export default function POS({ products, currentUser, categories, onCreateTransac
   );
 
   // Compact product reference card
-  function renderCard(product, cfg) {
-    cfg = cfg || getCatConfig(product.category, categories);
+  function renderCard(product) {
     const isLow = product.stock > 0 && product.stock <= product.lowStockAlert;
     const isOut = product.stock <= 0;
     const productName = product.name.replace(/ *\([^)]*\) */g, " ");

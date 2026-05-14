@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import '../styles/users.css';
 
 const ROLE_INFO = {
@@ -18,6 +18,17 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
   const [toggleId, setToggleId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [openLogUsers, setOpenLogUsers] = useState({});
+
+  const groupedLogs = useMemo(() => {
+    const grouped = new Map();
+    (auditLogs || []).slice().reverse().forEach(log => {
+      const name = log.user || 'Unknown';
+      if (!grouped.has(name)) grouped.set(name, []);
+      grouped.get(name).push(log);
+    });
+    return Array.from(grouped.entries());
+  }, [auditLogs]);
 
   const openAdd = () => { setForm(EMPTY_USER); setEditUser(null); setShowModal(true); setShowPass(true); setError(''); };
   const openEdit = (u) => { setForm({ ...u }); setEditUser(u); setShowModal(true); setShowPass(false); setError(''); };
@@ -177,22 +188,46 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
       {activeTab === 'logs' && (
         <div className="card card-custom">
           <div className="card-header-custom"><i className="bi bi-journal-text me-2"></i>Activity Audit Log</div>
-          <div className="table-responsive">
-            <table className="table table-hover mb-0 align-middle small">
-              <thead className="table-light">
-                <tr><th>#</th><th>User</th><th>Action</th><th>Timestamp</th></tr>
-              </thead>
-              <tbody>
-                {(auditLogs || []).slice().reverse().map(log => (
-                  <tr key={log.id}>
-                    <td className="text-muted">{log.id}</td>
-                    <td className="fw-semibold">{log.user}</td>
-                    <td>{log.action}</td>
-                    <td className="text-muted">{log.timestamp}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="activity-accordion">
+            {groupedLogs.length > 0 ? (
+              groupedLogs.map(([name, logs]) => {
+                const isOpen = Boolean(openLogUsers[name]);
+                return (
+                  <div key={name} className="activity-accordion-item">
+                    <button
+                      type="button"
+                      className="activity-accordion-trigger"
+                      onClick={() => setOpenLogUsers(prev => ({ ...prev, [name]: !prev[name] }))}
+                      aria-expanded={isOpen}
+                    >
+                      <span className="d-flex align-items-center gap-2 min-w-0">
+                        <i className={`bi ${isOpen ? 'bi-chevron-down' : 'bi-chevron-right'} flex-shrink-0`}></i>
+                        <span className="text-truncate">{name}</span>
+                      </span>
+                      <span className="badge bg-light text-dark border flex-shrink-0">{logs.length}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="activity-accordion-body">
+                        <ul className="list-group list-group-flush">
+                          {logs.map(log => (
+                            <li key={log.id} className="list-group-item py-2">
+                              <div className="d-flex justify-content-between align-items-start gap-2">
+                                <div className="min-w-0">
+                                  <div className="fw-semibold text-truncate">{log.action}</div>
+                                  <div className="text-muted activity-meta">#{log.id} • {log.timestamp}</div>
+                                </div>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="activity-empty text-muted small">No audit logs yet.</div>
+            )}
           </div>
         </div>
       )}

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Inventory({ products, categories, stockMovements, onStockIn }) {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [showStockIn, setShowStockIn] = useState(false);
+  const [openCategories, setOpenCategories] = useState({});
   const [stockInForm, setStockInForm] = useState({ productId: '', qty: '', note: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +46,22 @@ export default function Inventory({ products, categories, stockMovements, onStoc
     return { color: 'success', label: 'In Stock' };
   };
 
+  const activityGroups = useMemo(() => {
+    const productCategoryById = new Map(products.map(p => [p.id, p.category]));
+    const grouped = new Map();
+
+    (stockMovements || [])
+      .slice()
+      .reverse()
+      .forEach(movement => {
+        const category = productCategoryById.get(movement.productId) || 'Uncategorized';
+        if (!grouped.has(category)) grouped.set(category, []);
+        grouped.get(category).push(movement);
+      });
+
+    return Array.from(grouped.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [products, stockMovements]);
+
   return (
     <div>
       {/* Alert banners */}
@@ -85,7 +102,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
             <div className="card-header-custom">
               <i className="bi bi-clipboard2-data me-2"></i>Stock Levels ({filtered.length})
             </div>
-            <div className="table-responsive">
+            <div className="table-responsive table-scroll-panel table-scroll-panel--inventory">
               <table className="table table-hover mb-0 align-middle">
                 <thead className="table-light">
                   <tr>
@@ -144,27 +161,53 @@ export default function Inventory({ products, categories, stockMovements, onStoc
         <div className="col-lg-4">
           <div className="card card-custom">
             <div className="card-header-custom">
-              <i className="bi bi-clock-history me-2"></i>Recent Stock Activity
+              <i className="bi bi-clock-history me-2"></i>Recent Stock Activity by Category
             </div>
-            <div className="card-body p-0">
-              <ul className="list-group list-group-flush">
-                {(stockMovements || []).slice().reverse().map(h => (
-                  <li key={h.id} className="list-group-item py-2">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div>
-                        <div className="small fw-semibold">{h.product}</div>
-                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>{h.note || 'Stock movement'} • {h.date} {h.time}</div>
-                      </div>
-                      <span className={`badge ${h.type === 'stock-in' ? 'bg-success' : h.type === 'sale' ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                        {h.type === 'stock-in' ? '+' : '-'}{h.qty}
-                      </span>
+            <div className="activity-accordion">
+              {activityGroups.length > 0 ? (
+                activityGroups.map(([category, movements]) => {
+                  const isOpen = Boolean(openCategories[category]);
+                  return (
+                    <div key={category} className="activity-accordion-item">
+                      <button
+                        type="button"
+                        className="activity-accordion-trigger"
+                        onClick={() => setOpenCategories(prev => ({ ...prev, [category]: !prev[category] }))}
+                        aria-expanded={isOpen}
+                      >
+                        <span className="d-flex align-items-center gap-2 min-w-0">
+                          <i className={`bi ${isOpen ? 'bi-chevron-down' : 'bi-chevron-right'} flex-shrink-0`}></i>
+                          <span className="text-truncate">{category}</span>
+                        </span>
+                        <span className="badge bg-light text-dark border flex-shrink-0">{movements.length}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="activity-accordion-body">
+                          <ul className="list-group list-group-flush">
+                            {movements.map(h => (
+                              <li key={h.id} className="list-group-item py-2">
+                                <div className="d-flex justify-content-between align-items-start gap-2">
+                                  <div className="min-w-0">
+                                    <div className="small fw-semibold text-truncate">{h.product}</div>
+                                    <div className="text-muted activity-meta">{h.note || 'Stock movement'} • {h.date} {h.time}</div>
+                                  </div>
+                                  <span className={`badge ${h.type === 'stock-in' ? 'bg-success' : h.type === 'sale' ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                                    {h.type === 'stock-in' ? '+' : '-'}{h.qty}
+                                  </span>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                  </li>
-                ))}
-                {(!stockMovements || stockMovements.length === 0) && (
-                  <li className="list-group-item text-center text-muted py-3 small">No stock activity yet</li>
-                )}
-              </ul>
+                  );
+                })
+              ) : (
+                <div className="activity-empty text-muted small">
+                  No stock activity yet.
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -177,7 +177,7 @@
 .pcr-price {
   font-size: 0.78rem;
   font-weight: 800;
-  color: #1e2428;
+  color: var(--text-main);
 }
 
 .pcr-unit {
@@ -429,8 +429,21 @@ body[data-theme="dark"] .category-group-header {
   border-color: var(--border);
 }
 
+body[data-theme="dark"] .category-group-name {
+  color: #e6eaee;
+}
+
+body[data-theme="dark"] .category-group-count {
+  color: #b2bcc7;
+  background: #1a222a;
+}
+
 body[data-theme="dark"] .empty-cart {
   color: #9aa6b2;
+}
+
+body[data-theme="dark"] .pcr-price {
+  color: #e6eaee;
 }
 
 @media (max-width: 767.98px) {
