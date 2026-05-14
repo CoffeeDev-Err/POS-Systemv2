@@ -128,7 +128,7 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                 </thead>
                 <tbody>
                   {users.map(u => {
-                    const ri = ROLE_INFO[u.role];
+                    const ri = ROLE_INFO[u.role] || { label: u.role || 'Unknown', color: 'secondary', icon: 'bi-person' };
                     const isSelf = u.id === currentUser.id;
                     return (
                       <tr key={u.id} className={isSelf ? 'table-light' : ''}>
