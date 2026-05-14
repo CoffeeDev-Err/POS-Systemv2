@@ -128,13 +128,13 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                 </thead>
                 <tbody>
                   {users.map(u => {
-                    const ri = ROLE_INFO[u.role];
+                    const ri = ROLE_INFO[u.role] || { label: u.role || 'Unknown', color: 'secondary', icon: 'bi-person' };
                     const isSelf = u.id === currentUser.id;
                     return (
                       <tr key={u.id} className={isSelf ? 'table-light' : ''}>
                         <td>
                           <div className="d-flex align-items-center gap-2">
-                            <div className="user-avatar-sm">{u.name.charAt(0)}</div>
+                            <div className="user-avatar-sm">{(u.name || '?').charAt(0)}</div>
                             <div>
                               <div className="fw-semibold small">{u.name}</div>
                               {isSelf && <span className="badge bg-light text-dark border" style={{ fontSize: '0.65rem' }}>You</span>}

@@ -90,14 +90,11 @@ export default function App() {
 
   const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
-  const handleLogin = async (username, password, selectedRole) => {
+  const handleLogin = async (username, password) => {
     setLoading(true);
     setLoadError('');
     try {
-      const { user, token } = await apiLogin(username, password, selectedRole);
-      if (selectedRole && user.role !== selectedRole) {
-        throw new Error('Selected role does not match this account.');
-      }
+      const { user, token } = await apiLogin(username, password);
       setAuthToken(token);
       localStorage.setItem('pos_user', JSON.stringify(user));
       setCurrentUser(user);

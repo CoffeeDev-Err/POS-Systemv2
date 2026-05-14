@@ -1,146 +1,97 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Firebase-backed API — same interface as the old REST API so no other files change.
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { auth, db } from "../firebase/config";
+import { loginWithEmail, logout as fbLogout, changePassword as fbChangePassword } from "../firebase/authService";
+import * as fs from "../firebase/firestoreService";
 
-function getAuthToken() {
+// ---- auth token helpers (store Firebase UID as "token") ----
+export function getAuthToken() {
   return localStorage.getItem('pos_token');
 }
-
-function setAuthToken(token) {
-  localStorage.setItem('pos_token', token);
+export function setAuthToken(uid) {
+  localStorage.setItem('pos_token', uid);
 }
-
-function clearAuthToken() {
+export function clearAuthToken() {
   localStorage.removeItem('pos_token');
+  fbLogout().catch(() => {});
 }
 
-async function request(path, options = {}) {
-  const { method = 'GET', body, token } = options;
-  const headers = { 'Content-Type': 'application/json' };
-  const authToken = token || getAuthToken();
-  if (authToken) headers.Authorization = `Bearer ${authToken}`;
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+function waitForCurrentUser() {
+  return new Promise((resolve) => {
+    if (auth.currentUser) return resolve(auth.currentUser);
+    const unsub = onAuthStateChanged(auth, (user) => { unsub(); resolve(user); });
   });
-
-  if (!res.ok) {
-    let message = `Request failed with status ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data && data.message) message = data.message;
-    } catch {
-      // ignore JSON parse errors
-    }
-    const err = new Error(message);
-    err.status = res.status;
-    throw err;
-  }
-
-  if (res.status === 204) return null;
-  return res.json();
 }
 
-export {
-  API_BASE,
-  request,
-  getAuthToken,
-  setAuthToken,
-  clearAuthToken,
-};
+// ---- auth ----
+export async function login(username, password) {
+  const snap = await getDocs(query(collection(db, "users"), where("username", "==", username)));
+  if (snap.empty) throw new Error("Invalid username or password.");
+  const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+  if (!userData.email) throw new Error("Account has no email configured.");
+  if (userData.active === false) throw new Error("This account has been deactivated.");
 
-export async function login(username, password, role) {
-  return request('/auth/login', { method: 'POST', body: { username, password, role } });
+  await loginWithEmail(userData.email, password);
+  const user = { id: userData.id, ...userData };
+  delete user.password;
+
+  return { user, token: user.id };
 }
 
 export async function fetchMe() {
-  return request('/auth/me');
+  const fbUser = await waitForCurrentUser();
+  if (!fbUser) throw Object.assign(new Error("Not authenticated"), { status: 401 });
+
+  const snap = await getDocs(query(collection(db, "users"), where("email", "==", fbUser.email)));
+  if (snap.empty) throw Object.assign(new Error("User not found"), { status: 404 });
+  const data = snap.docs[0].data();
+  const user = { id: snap.docs[0].id, ...data };
+  delete user.password;
+  return { user };
 }
 
-export async function fetchProducts() {
-  return request('/products');
-}
+// ---- products ----
+export const fetchProducts = fs.fetchProducts;
+export const createProduct = fs.createProduct;
+export const updateProduct = fs.updateProduct;
+export const deleteProduct = fs.deleteProduct;
 
-export async function createProduct(payload) {
-  return request('/products', { method: 'POST', body: payload });
-}
+// ---- categories ----
+export const fetchCategories = fs.fetchCategories;
+export const createCategory = (name) => fs.createCategory(name);
+export const deleteCategory = (id) => fs.deleteCategory(id);
 
-export async function updateProduct(id, payload) {
-  return request(`/products/${id}`, { method: 'PUT', body: payload });
-}
+// ---- users ----
+export const fetchUsers = fs.fetchUsers;
+export const createUser = fs.createUser;
+export const updateUser = fs.updateUser;
+export const updateUserStatus = fs.updateUserStatus;
 
-export async function deleteProduct(id) {
-  return request(`/products/${id}`, { method: 'DELETE' });
-}
-
-export async function fetchCategories() {
-  return request('/categories');
-}
-
-export async function createCategory(name) {
-  return request('/categories', { method: 'POST', body: { name } });
-}
-
-export async function deleteCategory(idOrName, options = {}) {
-  const encoded = encodeURIComponent(idOrName);
-  const params = new URLSearchParams();
-  if (options.deleteProducts) params.set('deleteProducts', 'true');
-  const qs = params.toString();
-  return request(`/categories/${encoded}${qs ? `?${qs}` : ''}`, { method: 'DELETE' });
-}
-
-export async function fetchUsers() {
-  return request('/users');
-}
-
-export async function createUser(payload) {
-  return request('/users', { method: 'POST', body: payload });
-}
-
-export async function updateUser(id, payload) {
-  return request(`/users/${id}`, { method: 'PUT', body: payload });
-}
-
-export async function updateUserStatus(id, payload) {
-  return request(`/users/${id}/status`, { method: 'PATCH', body: payload || {} });
-}
-
-export async function fetchTransactions() {
-  return request('/transactions');
-}
-
+// ---- transactions ----
+export const fetchTransactions = fs.fetchTransactions;
 export async function createTransaction(payload) {
-  return request('/transactions', { method: 'POST', body: payload });
+  const { updatedProducts, ...transaction } = await fs.createTransaction(payload);
+  return { transaction, updatedProducts };
 }
 
-export async function fetchStockMovements() {
-  return request('/stock-movements');
-}
-
+// ---- stock movements ----
+export const fetchStockMovements = fs.fetchStockMovements;
 export async function createStockMovement(payload) {
-  return request('/stock-movements', { method: 'POST', body: payload });
+  const { updatedProduct, ...movement } = await fs.createStockMovement(payload);
+  return { movement, product: updatedProduct };
 }
 
-export async function fetchSettings() {
-  return request('/settings');
-}
+// ---- settings ----
+export const fetchSettings = fs.fetchSettings;
+export const updateSettings = fs.updateSettings;
 
-export async function updateSettings(payload) {
-  return request('/settings', { method: 'PUT', body: payload });
-}
+// ---- expenses ----
+export const fetchExpenses = (from, to) => fs.fetchExpenses(from, to);
+export const createExpense = fs.createExpense;
 
-export async function fetchAuditLogs() {
-  return request('/audit-logs');
-}
+// ---- audit logs ----
+export const fetchAuditLogs = fs.fetchAuditLogs;
 
-export async function fetchExpenses(from, to) {
-  const params = new URLSearchParams();
-  if (from) params.set('from', from);
-  if (to) params.set('to', to);
-  const qs = params.toString();
-  return request(`/expenses${qs ? `?${qs}` : ''}`);
-}
-
-export async function createExpense(payload) {
-  return request('/expenses', { method: 'POST', body: payload });
-}
+// ---- password ----
+export const changePassword = (currentPassword, newPassword) => fbChangePassword(currentPassword, newPassword);
