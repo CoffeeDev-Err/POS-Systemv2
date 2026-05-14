@@ -17,6 +17,9 @@ dist-ssr
 # Backend env
 backend/.env
 
+# Firebase service account key — never commit this
+serviceAccountKey.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

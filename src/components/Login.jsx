@@ -1,34 +1,21 @@
 import { useState } from 'react';
 import '../styles/login.css';
 
-const ROLE_OPTIONS = [
-  { label: 'Owner', icon: 'bi-shield-fill-check', color: 'danger', role: 'superadmin' },
-  { label: 'Admin', icon: 'bi-person-badge-fill', color: 'warning', role: 'admin' },
-  { label: 'Cashier', icon: 'bi-cash-coin', color: 'success', role: 'cashier' },
-];
-
 export default function Login({ onLogin, loading, error, theme, onToggleTheme }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [selectedRole, setSelectedRole] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!selectedRole) {
-      setFormError('Please select a role before signing in.');
-      return;
-    }
     try {
-      await onLogin(username, password, selectedRole);
+      await onLogin(username, password);
     } catch (err) {
       setFormError(err.message || 'Invalid username or password. Please try again.');
     }
   };
-
-  const selectedRoleLabel = ROLE_OPTIONS.find((option) => option.role === selectedRole)?.label;
 
   return (
     <div className="login-page d-flex align-items-center justify-content-center min-vh-100">
@@ -107,35 +94,6 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
             }
           </button>
         </form>
-
-        {/* Role selection */}
-        <div className="mt-4">
-          <p className="text-center text-muted small mb-2">— Select Role —</p>
-          <div className="row g-2">
-            {ROLE_OPTIONS.map((role) => (
-              <div className="col-4" key={role.label}>
-                <button
-                  type="button"
-                  className={`role-btn border-${role.color} ${selectedRole === role.role ? 'role-btn-active' : ''}`}
-                  onClick={() => {
-                    setSelectedRole(role.role);
-                    setFormError('');
-                  }}
-                  aria-pressed={selectedRole === role.role}
-                  disabled={loading}
-                >
-                  <i className={`bi ${role.icon} d-block mb-1 text-${role.color}`}></i>
-                  <small className={`role-label text-${role.color}`}>{role.label}</small>
-                </button>
-              </div>
-            ))}
-          </div>
-          {selectedRoleLabel && (
-            <p className="text-center text-muted small mt-2 mb-0">
-              Selected: <span className="fw-semibold">{selectedRoleLabel}</span>
-            </p>
-          )}
-        </div>
 
         <p className="text-center text-muted mt-4 mb-0" style={{ fontSize: '0.75rem' }}>
           <i className="bi bi-shield-lock me-1"></i>

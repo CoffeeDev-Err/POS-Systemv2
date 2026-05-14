@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { changePassword } from '../utils/api';
 
-export default function Settings({ settings, onSaveSettings }) {
+export default function Settings({ settings, onSaveSettings, currentUser }) {
   const [store, setStore] = useState({
     storeName: settings?.storeName || "CARREN'S STORE",
     address: settings?.address || 'Urdaneta, Ilocos',
@@ -10,6 +11,33 @@ export default function Settings({ settings, onSaveSettings }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSaved, setPwSaved] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  const handleChangePassword = async () => {
+    setPwError('');
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError('All fields are required.'); return; }
+    if (pwForm.next.length < 6) { setPwError('New password must be at least 6 characters.'); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError('Passwords do not match.'); return; }
+    setPwSaving(true);
+    try {
+      await changePassword(pwForm.current, pwForm.next);
+      setPwForm({ current: '', next: '', confirm: '' });
+      setPwSaved(true);
+      setTimeout(() => setPwSaved(false), 2500);
+    } catch (err) {
+      const msg = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
+        ? 'Current password is incorrect.'
+        : err.message || 'Failed to change password.';
+      setPwError(msg);
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!settings) return;
@@ -70,6 +98,49 @@ export default function Settings({ settings, onSaveSettings }) {
                 {saving
                   ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
                   : <><i className="bi bi-save me-2"></i>Save Settings</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="col-lg-6">
+          <div className="card card-custom">
+            <div className="card-header-custom"><i className="bi bi-key me-2"></i>Change Password</div>
+            <div className="card-body">
+              <p className="text-muted small mb-3">
+                Logged in as <strong>{currentUser?.name}</strong> ({currentUser?.role})
+              </p>
+              {[
+                { label: 'Current Password', key: 'current', placeholder: 'Enter current password' },
+                { label: 'New Password',     key: 'next',    placeholder: 'At least 6 characters' },
+                { label: 'Confirm New Password', key: 'confirm', placeholder: 'Repeat new password' },
+              ].map(({ label, key, placeholder }) => (
+                <div className="mb-3" key={key}>
+                  <label className="form-label fw-semibold">{label}</label>
+                  <div className="input-group">
+                    <input
+                      type={showPw ? 'text' : 'password'}
+                      className="form-control"
+                      placeholder={placeholder}
+                      value={pwForm[key]}
+                      onChange={e => setPwForm(f => ({ ...f, [key]: e.target.value }))}
+                    />
+                    {key === 'confirm' && (
+                      <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPw(v => !v)} aria-label="Toggle password visibility">
+                        <i className={`bi ${showPw ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {pwError && <div className="alert alert-danger py-2 small"><i className="bi bi-exclamation-circle me-1"></i>{pwError}</div>}
+              {pwSaved && <div className="alert alert-success py-2 small"><i className="bi bi-check-circle me-1"></i>Password changed successfully!</div>}
+              <button className="btn btn-dark" onClick={handleChangePassword} disabled={pwSaving}>
+                {pwSaving
+                  ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                  : <><i className="bi bi-lock me-2"></i>Change Password</>
                 }
               </button>
             </div>
