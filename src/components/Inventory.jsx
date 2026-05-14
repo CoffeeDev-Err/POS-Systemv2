@@ -19,7 +19,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
   });
 
   const handleStockIn = async () => {
-    const product = products.find(p => p.id === parseInt(stockInForm.productId));
+    const product = products.find(p => String(p.id) === String(stockInForm.productId));
     if (!product || !stockInForm.qty) return;
 
     setSaving(true);
@@ -250,7 +250,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                   <div className="alert alert-info py-2 small">
                     <i className="bi bi-info-circle me-1"></i>
                     New stock will be: <strong>
-                      {(products.find(p => p.id === parseInt(stockInForm.productId))?.stock || 0) + parseInt(stockInForm.qty || 0)}
+                      {(products.find(p => String(p.id) === String(stockInForm.productId))?.stock || 0) + parseInt(stockInForm.qty || 0)}
                     </strong> units
                   </div>
                 )}

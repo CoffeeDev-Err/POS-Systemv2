@@ -71,16 +71,15 @@ export const updateUserStatus = fs.updateUserStatus;
 // ---- transactions ----
 export const fetchTransactions = fs.fetchTransactions;
 export async function createTransaction(payload) {
-  const transaction = await fs.createTransaction(payload);
-  // Replicate the shape the hook expects: { transaction, updatedProducts }
-  return { transaction, updatedProducts: [] };
+  const { updatedProducts, ...transaction } = await fs.createTransaction(payload);
+  return { transaction, updatedProducts };
 }
 
 // ---- stock movements ----
 export const fetchStockMovements = fs.fetchStockMovements;
 export async function createStockMovement(payload) {
-  const movement = await fs.createStockMovement(payload);
-  return { movement, product: payload };
+  const { updatedProduct, ...movement } = await fs.createStockMovement(payload);
+  return { movement, product: updatedProduct };
 }
 
 // ---- settings ----
