@@ -74,7 +74,45 @@ export const fetchTransactions = () =>
   getDocs(query(col("transactions"), orderBy("createdAt", "desc"))).then(toList);
 
 export async function createTransaction(payload) {
-  const ref = await addDoc(col("transactions"), { ...payload, createdAt: serverTimestamp() });
+  // Normalize transaction shape: compute date, time, subtotal, and lookup cashierName
+  const now = new Date();
+  
+  // Use LOCAL timezone for date, not UTC
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const date = `${year}-${month}-${day}`; // YYYY-MM-DD format in local timezone
+  
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const time = `${hours}:${minutes}`; // HH:MM format
+  
+  // Calculate subtotal from items
+  const subtotal = (payload.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
+  
+  // Lookup cashierName from users collection
+  let cashierName = "Unknown";
+  if (payload.cashierId) {
+    const userSnap = await getDoc(doc(db, "users", payload.cashierId));
+    if (userSnap.exists()) {
+      cashierName = userSnap.data().name || "Unknown";
+    }
+  }
+  
+  // Create normalized transaction doc
+  const docPayload = {
+    ...payload,
+    date,
+    time,
+    subtotal,
+    cashierName,
+    cash: Number(payload.cash) || 0,
+    change: Number(payload.change) || 0,
+    cashierId: payload.cashierId || "",
+    createdAt: serverTimestamp()
+  };
+  
+  const ref = await addDoc(col("transactions"), docPayload);
 
   const updatedProducts = [];
   for (const item of payload.items || []) {
@@ -87,7 +125,7 @@ export async function createTransaction(payload) {
     }
   }
 
-  return { id: ref.id, ...payload, updatedProducts };
+  return { id: ref.id, ...docPayload, cashierName, updatedProducts };
 }
 
 // --- stock movements (also increments product stock) ---
