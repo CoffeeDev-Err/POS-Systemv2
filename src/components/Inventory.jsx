@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 
-export default function Inventory({ products, categories, stockMovements, onStockIn }) {
+// Products whose name contains "egg" are considered harvest/poultry products
+const isPoultryProduct = (p) => p.name.toLowerCase().includes('egg');
+
+export default function Inventory({ products, categories, stockMovements, onStockIn, currentUser }) {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [showStockIn, setShowStockIn] = useState(false);
@@ -10,7 +13,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
   const [error, setError] = useState('');
 
   const [showHarvest, setShowHarvest] = useState(false);
-  const [harvestForm, setHarvestForm] = useState({ productId: '', qty: '', note: 'Harvest' });
+  const [harvestForm, setHarvestForm] = useState({ productId: '', qty: '', variantQtys: {}, note: 'Harvest' });
   const [harvestSaving, setHarvestSaving] = useState(false);
   const [harvestError, setHarvestError] = useState('');
 
@@ -51,23 +54,54 @@ export default function Inventory({ products, categories, stockMovements, onStoc
 
   const handleHarvest = async () => {
     const product = products.find(p => String(p.id) === String(harvestForm.productId));
-    if (!product || !harvestForm.qty) return;
+    if (!product) return;
+
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const inputBy = currentUser?.name || '';
 
     setHarvestSaving(true);
     setHarvestError('');
 
     try {
-      const now = new Date();
-      await onStockIn({
-        productId: product.id,
-        product: product.name,
-        qty: parseInt(harvestForm.qty),
-        note: harvestForm.note || 'Harvest',
-        type: 'harvest',
-        date: now.toISOString().slice(0, 10),
-        time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
-      });
-      setHarvestForm({ productId: '', qty: '', note: 'Harvest' });
+      if (product.hasVariants) {
+        // Save one movement per variant that has a qty > 0
+        const entries = (product.variants || [])
+          .map(v => ({ variant: v, qty: parseInt(harvestForm.variantQtys[v.id] || 0) }))
+          .filter(e => e.qty > 0);
+        if (entries.length === 0) {
+          setHarvestError('Enter at least one harvest quantity.');
+          return;
+        }
+        for (const { variant, qty } of entries) {
+          await onStockIn({
+            productId: product.id,
+            product: product.name,
+            variant: variant.name,
+            qty,
+            note: harvestForm.note || 'Harvest',
+            type: 'harvest',
+            inputBy,
+            date,
+            time,
+          });
+        }
+      } else {
+        if (!harvestForm.qty || parseInt(harvestForm.qty) <= 0) return;
+        await onStockIn({
+          productId: product.id,
+          product: product.name,
+          variant: 'none',
+          qty: parseInt(harvestForm.qty),
+          note: harvestForm.note || 'Harvest',
+          type: 'harvest',
+          inputBy,
+          date,
+          time,
+        });
+      }
+      setHarvestForm({ productId: '', qty: '', variantQtys: {}, note: 'Harvest' });
       setShowHarvest(false);
     } catch (err) {
       setHarvestError(err.message || 'Failed to save harvest.');
@@ -238,8 +272,16 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                               <li key={h.id} className="list-group-item py-2">
                                 <div className="d-flex justify-content-between align-items-start gap-2">
                                   <div className="min-w-0">
-                                    <div className="small fw-semibold text-truncate">{h.product}</div>
-                                    <div className="text-muted activity-meta">{h.note || 'Stock movement'} • {h.date} {h.time}</div>
+                                    <div className="small fw-semibold text-truncate">
+                                      {h.product}
+                                      {h.variant && h.variant !== 'none' && (
+                                        <span className="badge bg-info text-dark ms-1 fw-normal" style={{ fontSize: '0.6rem' }}>{h.variant}</span>
+                                      )}
+                                    </div>
+                                    <div className="text-muted activity-meta">
+                                      {h.note || 'Stock movement'} • {h.date} {h.time}
+                                      {h.inputBy && <span className="ms-1">by {h.inputBy}</span>}
+                                    </div>
                                   </div>
                                   <span className={`badge ${
                     h.type === 'harvest' ? 'bg-info text-dark' :
@@ -268,86 +310,134 @@ export default function Inventory({ products, categories, stockMovements, onStoc
       </div>
 
       {/* Harvest Input Modal */}
-      {showHarvest && (
-        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title"><i className="bi bi-basket me-2 text-success"></i>Harvest Input</h5>
-                <button className="btn-close" onClick={() => setShowHarvest(false)} aria-label="Close"></button>
-              </div>
-              <div className="modal-body">
-                {harvestError && (
-                  <div className="alert alert-danger py-2 small">
-                    <i className="bi bi-exclamation-circle me-1"></i>{harvestError}
+      {showHarvest && (() => {
+        const poultryProducts = products.filter(isPoultryProduct);
+        const selProd = products.find(p => String(p.id) === String(harvestForm.productId));
+        const isVariant = selProd?.hasVariants;
+        const totalHarvestPcs = isVariant
+          ? (selProd?.variants || []).reduce((s, v) => s + (parseInt(harvestForm.variantQtys[v.id] || 0)), 0)
+          : (parseInt(harvestForm.qty) || 0);
+        const canSave = harvestForm.productId && (
+          isVariant
+            ? (selProd?.variants || []).some(v => parseInt(harvestForm.variantQtys[v.id] || 0) > 0)
+            : parseInt(harvestForm.qty) > 0
+        );
+        return (
+          <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title"><i className="bi bi-basket me-2 text-success"></i>Harvest Input</h5>
+                  <button className="btn-close" onClick={() => { setShowHarvest(false); setHarvestError(''); }} aria-label="Close"></button>
+                </div>
+                <div className="modal-body">
+                  {harvestError && (
+                    <div className="alert alert-danger py-2 small">
+                      <i className="bi bi-exclamation-circle me-1"></i>{harvestError}
+                    </div>
+                  )}
+
+                  {/* Product selector — poultry only */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Select Product *</label>
+                    {poultryProducts.length === 0 ? (
+                      <div className="text-muted small">No egg/poultry products found.</div>
+                    ) : (
+                      <select
+                        className="form-select"
+                        value={harvestForm.productId}
+                        onChange={e => setHarvestForm({ productId: e.target.value, qty: '', variantQtys: {}, note: harvestForm.note })}
+                      >
+                        <option value="">-- Choose product --</option>
+                        {poultryProducts.map(p => {
+                          const unit = p.hasVariants ? (p.baseUnit || 'pc') : p.unit;
+                          return <option key={p.id} value={p.id}>{p.name} (stock: {p.stock.toLocaleString()} {unit})</option>;
+                        })}
+                      </select>
+                    )}
                   </div>
-                )}
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Select Product *</label>
-                  <select className="form-select" value={harvestForm.productId} onChange={e => setHarvestForm({ ...harvestForm, productId: e.target.value })}>
-                    <option value="">-- Choose product --</option>
-                    {products.map(p => {
-                      const unit = p.hasVariants ? (p.baseUnit || 'pc') : p.unit;
-                      return <option key={p.id} value={p.id}>{p.name} (Current: {p.stock} {unit})</option>;
-                    })}
-                  </select>
-                </div>
-                <div className="mb-3">
-                  {(() => {
-                    const selProd = products.find(p => String(p.id) === String(harvestForm.productId));
-                    const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || 'pc');
-                    return (
-                      <>
-                        <label className="form-label fw-semibold">
-                          Quantity Harvested *
-                          {selProd && <span className="text-muted fw-normal ms-1">(in {unit}s)</span>}
-                        </label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          value={harvestForm.qty}
-                          onChange={e => setHarvestForm({ ...harvestForm, qty: e.target.value })}
-                          placeholder="Enter quantity"
-                          min="1"
-                        />
-                      </>
-                    );
-                  })()}
-                </div>
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Note</label>
-                  <input
-                    className="form-control"
-                    value={harvestForm.note}
-                    onChange={e => setHarvestForm({ ...harvestForm, note: e.target.value })}
-                    placeholder="e.g. Morning harvest, Batch 1..."
-                  />
-                </div>
-                {harvestForm.productId && harvestForm.qty && (
-                  <div className="alert alert-success py-2 small">
-                    <i className="bi bi-basket me-1"></i>
-                    {(() => {
-                      const selProd = products.find(p => String(p.id) === String(harvestForm.productId));
-                      const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || 'unit');
-                      const newQty = (selProd?.stock || 0) + parseInt(harvestForm.qty || 0);
-                      return <>New stock will be: <strong>{newQty} {unit}s</strong></>;
-                    })()}
+
+                  {/* Qty inputs — per-variant for Chicken Eggs, single for Quail Eggs */}
+                  {selProd && (
+                    <div className="mb-3">
+                      {isVariant ? (
+                        <>
+                          <label className="form-label fw-semibold">
+                            Harvest Quantity per Size
+                            <span className="text-muted fw-normal ms-1 small">(in pcs — leave blank if none)</span>
+                          </label>
+                          {(selProd.variants || []).map(v => (
+                            <div key={v.id} className="d-flex align-items-center gap-2 mb-2">
+                              <span className="badge bg-secondary text-white fw-semibold" style={{ minWidth: 64, textAlign: 'center' }}>{v.name}</span>
+                              <input
+                                type="number"
+                                className="form-control form-control-sm"
+                                placeholder="0"
+                                min="0"
+                                value={harvestForm.variantQtys[v.id] || ''}
+                                onChange={e => setHarvestForm(prev => ({
+                                  ...prev,
+                                  variantQtys: { ...prev.variantQtys, [v.id]: e.target.value },
+                                }))}
+                              />
+                              <span className="text-muted small flex-shrink-0">pcs</span>
+                            </div>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          <label className="form-label fw-semibold">
+                            Quantity Harvested *
+                            <span className="text-muted fw-normal ms-1 small">(in pcs)</span>
+                          </label>
+                          <input
+                            type="number"
+                            className="form-control"
+                            value={harvestForm.qty}
+                            onChange={e => setHarvestForm(prev => ({ ...prev, qty: e.target.value }))}
+                            placeholder="e.g. 3000"
+                            min="1"
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Note */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Note</label>
+                    <input
+                      className="form-control"
+                      value={harvestForm.note}
+                      onChange={e => setHarvestForm(prev => ({ ...prev, note: e.target.value }))}
+                      placeholder="e.g. Morning harvest, Batch 1..."
+                    />
                   </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-outline-secondary" onClick={() => setShowHarvest(false)}>Cancel</button>
-                <button className="btn btn-success" onClick={handleHarvest} disabled={harvestSaving || !harvestForm.productId || !harvestForm.qty}>
-                  {harvestSaving
-                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
-                    : <><i className="bi bi-check2 me-2"></i>Record Harvest</>
-                  }
-                </button>
+
+                  {/* Summary preview */}
+                  {selProd && totalHarvestPcs > 0 && (
+                    <div className="alert alert-success py-2 small mb-0">
+                      <i className="bi bi-basket me-1"></i>
+                      +{totalHarvestPcs.toLocaleString()} pcs harvested
+                      {' → '} New total stock: <strong>{((selProd.stock || 0) + totalHarvestPcs).toLocaleString()} pcs</strong>
+                      {currentUser?.name && <span className="ms-2 text-muted">by {currentUser.name}</span>}
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-outline-secondary" onClick={() => { setShowHarvest(false); setHarvestError(''); }}>Cancel</button>
+                  <button className="btn btn-success" onClick={handleHarvest} disabled={harvestSaving || !canSave}>
+                    {harvestSaving
+                      ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                      : <><i className="bi bi-check2 me-2"></i>Save Harvest</>
+                    }
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Stock In Modal */}
       {showStockIn && (

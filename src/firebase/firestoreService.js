@@ -1,7 +1,7 @@
 import {
   collection, doc,
   getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, serverTimestamp, runTransaction,
+  query, where, orderBy, serverTimestamp, runTransaction, increment,
 } from "firebase/firestore";
 import { db } from "./config";
 import { createAuthUser } from "./authService";
@@ -175,7 +175,7 @@ export async function createTransaction(payload) {
   return { id: ref.id, ...docPayload, cashierName, updatedProducts, credit };
 }
 
-// --- stock movements (also increments product stock) ---
+// --- stock movements (also increments product stock atomically) ---
 export const fetchStockMovements = () => getDocs(col("stockMovements")).then(toList);
 
 export async function createStockMovement(payload) {
@@ -185,8 +185,9 @@ export async function createStockMovement(payload) {
   const pSnap = await getDoc(pRef);
   let updatedProduct = null;
   if (pSnap.exists()) {
+    // Use increment() so concurrent writes (e.g. two cashiers) don't race
+    await updateDoc(pRef, { stock: increment(Number(payload.qty)) });
     const newStock = (pSnap.data().stock || 0) + Number(payload.qty);
-    await updateDoc(pRef, { stock: newStock });
     updatedProduct = { id: payload.productId, ...serialize(pSnap.data()), stock: newStock };
   }
 
