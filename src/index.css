@@ -490,6 +490,33 @@ margin-top: 0;
   right: 14px;
 }
 
+/* Filter pill buttons (Credit Ledger, etc.) */
+.btn-filter {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.btn-filter:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.btn-filter.btn-filter--active {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #fff !important;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
+}
+
+.btn-filter.btn-filter--active:hover {
+  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  box-shadow: 0 3px 12px rgba(13, 148, 136, 0.45);
+}
+
 /* Cards */
 .card-custom {
   background: var(--card-bg);
