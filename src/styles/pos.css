@@ -367,6 +367,33 @@
   cursor: not-allowed;
 }
 
+/* Filter pill buttons (Credit Ledger, etc.) */
+.btn-filter {
+  border: 1px solid #d1d5db;
+  background: transparent;
+  color: #4b5563;
+  border-radius: 8px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.btn-filter:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.btn-filter.btn-filter--active {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #fff !important;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
+}
+
+.btn-filter.btn-filter--active:hover {
+  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  box-shadow: 0 3px 12px rgba(13, 148, 136, 0.45);
+}
+
 /* Bluetooth POS Widget */
 .bt-pos-widget {
   padding: 0.65rem 0.75rem;

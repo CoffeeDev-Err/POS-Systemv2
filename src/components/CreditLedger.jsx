@@ -340,7 +340,7 @@ export default function CreditLedger({
             ].map(f => (
               <button
                 key={f.key}
-                className={`btn btn-sm ${statusFilter === f.key ? 'btn-process' : 'btn-outline-secondary'}`}
+                className={`btn btn-sm btn-filter${statusFilter === f.key ? ' btn-filter--active' : ''}`}
                 onClick={() => setStatusFilter(f.key)}
               >
                 {f.label}
