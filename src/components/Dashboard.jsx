@@ -76,7 +76,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
                     <tbody>
                       {todayTxns.slice().reverse().map(txn => (
                         <tr key={txn.id}>
-                          <td><code className="small">{txn.id}</code></td>
+                          <td><code className="small">{txn.orNumber || txn.id?.slice(-8)}</code></td>
                           <td>{txn.time}</td>
                           <td>{txn.items.length} item{txn.items.length > 1 ? 's' : ''}</td>
                           <td className="text-end fw-semibold text-success">₱{txn.subtotal.toLocaleString()}</td>

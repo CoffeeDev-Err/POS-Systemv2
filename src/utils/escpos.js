@@ -46,53 +46,66 @@ export function buildReceiptBytes(data) {
   t(data.storeName + '\n');
   p(CMD.sizeNormal);
   p(CMD.boldOff);
-  t((data.address || '') + '\n');
-  if (data.phone) t('Tel: ' + data.phone + '\n');
+  if (data.address) t(data.address + '\n');
+  if (data.phone)   t('Tel: ' + data.phone + '\n');
   t(divider);
 
   // Transaction info
   p(CMD.alignLeft);
-  t(`TXN # : ${data.txnId}\n`);
-  t(`Date  : ${data.date}\n`);
-  t(`Time  : ${data.time}\n`);
+  t(`OR #   : ${data.orNumber || data.txnId}\n`);
+  t(`Date   : ${data.date}\n`);
+  t(`Time   : ${data.time}\n`);
   t(`Cashier: ${data.cashierName}\n`);
   t(divider2);
 
   // Column headers
-  t(pad('Item', 20) + pad('Qty', 4) + pad('Amt', 8, true) + '\n');
+  t(pad('Item', 18) + pad('Qty', 6) + pad('Amt', 8, true) + '\n');
   t(divider2);
 
   // Items
   data.items.forEach(item => {
-    const name = item.name.length > 20 ? item.name.substring(0, 20) : item.name;
-    const qty = String(item.qty);
-    const amt = `PHP ${item.total.toFixed(2)}`;
-    t(pad(name, 20) + pad(qty, 4) + pad(amt, 8, true) + '\n');
-    if (item.qty > 1) {
-      t(`  @ PHP ${item.price.toFixed(2)} each\n`);
-    }
+    const label = item.variantName ? `${item.name} (${item.variantName})` : item.name;
+    const name  = label.length > 18 ? label.substring(0, 18) : label;
+    const qty   = `${item.qty}${item.unit ? ' ' + item.unit : ''}`;
+    const amt   = `P${Number(item.total).toFixed(2)}`;
+    t(pad(name, 18) + pad(qty, 6) + pad(amt, 8, true) + '\n');
+    t(`  @ P${Number(item.price).toFixed(2)} each\n`);
   });
 
   t(divider);
 
   // Totals
   p(CMD.boldOn);
-  t(twoCol('TOTAL:', `PHP ${data.total.toFixed(2)}`));
+  t(twoCol('SUBTOTAL:', `P${Number(data.total).toFixed(2)}`));
   p(CMD.boldOff);
-  t(twoCol('CASH:', `PHP ${data.cash.toFixed(2)}`));
-  t(twoCol('CHANGE:', `PHP ${data.change.toFixed(2)}`));
+  const pm = (data.paymentMethod || 'cash').toUpperCase();
+  t(twoCol('PAYMENT:', pm));
+  if (pm === 'CASH') {
+    if (data.cash != null)   t(twoCol('CASH:',   `P${Number(data.cash).toFixed(2)}`));
+    if (data.change != null) t(twoCol('CHANGE:', `P${Number(data.change).toFixed(2)}`));
+  }
+
+  // Customer details
+  if (data.customer?.name || data.customer?.contact || data.customer?.address) {
+    t(divider2);
+    t('Customer:\n');
+    if (data.customer.name)    t(`  Name: ${data.customer.name}\n`);
+    if (data.customer.contact) t(`  Tel : ${data.customer.contact}\n`);
+    if (data.customer.address) t(`  Addr: ${data.customer.address}\n`);
+  }
+
   t(divider);
 
   // Footer
   p(CMD.alignCenter);
-  t('Salamat sa inyong pagbili!\n');
-  t('Please come again :)\n');
+  const footerText = data.footer || data.receiptFooter || 'Salamat sa inyong pagbili!';
+  t(footerText + '\n');
   p(CMD.feed5);
   p(CMD.cut);
 
   // Merge
-  const total = parts.reduce((s, p) => s + p.length, 0);
-  const result = new Uint8Array(total);
+  const byteLen = parts.reduce((s, chunk) => s + chunk.length, 0);
+  const result = new Uint8Array(byteLen);
   let offset = 0;
   parts.forEach(chunk => { result.set(chunk, offset); offset += chunk.length; });
   return result;

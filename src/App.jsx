@@ -11,6 +11,7 @@ const Users = lazy(() => import('./components/Users'));
 const Settings = lazy(() => import('./components/Settings'));
 const Orders = lazy(() => import('./components/Orders'));
 const CreditLedger = lazy(() => import('./components/CreditLedger'));
+const Transactions = lazy(() => import('./components/Transactions'));
 
 import {
   login as apiLogin,
@@ -54,6 +55,7 @@ export default function App() {
     handleCreateUser,
     handleUpdateUser,
     handleUpdateUserStatus,
+    handleDeleteUser,
     handleCreateTransaction,
     handleStockIn,
     handleCreateExpense,
@@ -64,6 +66,7 @@ export default function App() {
     credits,
     handleAddCreditPayment,
     handleUpdateCreditDueDate,
+    handleVoidTransaction,
   } = useAppData(currentUser);
 
   useEffect(() => {
@@ -149,6 +152,7 @@ export default function App() {
       onCreateUser: handleCreateUser,
       onUpdateUser: handleUpdateUser,
       onUpdateUserStatus: handleUpdateUserStatus,
+      onDeleteUser: handleDeleteUser,
       onCreateTransaction: handleCreateTransaction,
       onStockIn: handleStockIn,
       onCreateExpense: handleCreateExpense,
@@ -159,6 +163,7 @@ export default function App() {
       credits,
       onAddCreditPayment: handleAddCreditPayment,
       onUpdateCreditDueDate: handleUpdateCreditDueDate,
+      onVoidTransaction: handleVoidTransaction,
     };
 
     switch (currentPage) {
@@ -180,6 +185,8 @@ export default function App() {
         return <Orders {...props} />;
       case 'credits':
         return <CreditLedger {...props} />;
+      case 'transactions':
+        return <Transactions {...props} />;
       default:
         return <Dashboard {...props} />;
     }
@@ -195,6 +202,7 @@ export default function App() {
     settings: 'settings',
     orders: 'page',
     credits: 'page',
+    transactions: 'page',
   }[currentPage] || 'page';
 
   return (

@@ -2,12 +2,6 @@ import { useState } from 'react';
 import { openCashDrawerViaBluetooth, printViaBluetooth } from '../utils/escpos';
 import '../styles/receipt.css';
 
-const STORE_INFO = {
-  storeName: "CARREN'S STORE",
-  address:   'Urdaneta, Ilocos',
-  phone:     '09XX-XXX-XXXX',
-};
-
 function OrderCard({ order }) {
   return (
     <div className="p-3">
@@ -41,7 +35,7 @@ function OrderCard({ order }) {
   );
 }
 
-export default function Orders({ orders, currentUser, onUpdateOrder, onCreateTransaction }) {
+export default function Orders({ orders, currentUser, settings, onUpdateOrder, onCreateTransaction }) {
   const [activeTab, setActiveTab]           = useState('pending');
   const [selectedOrder, setSelectedOrder]   = useState(null);
   const [showPayModal, setShowPayModal]     = useState(false);
@@ -122,16 +116,8 @@ export default function Orders({ orders, currentUser, onUpdateOrder, onCreateTra
       const now = new Date();
       const completedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-      await onUpdateOrder(selectedOrder.id, {
-        status: 'completed',
-        paymentMethod: payMethod,
-        dueDate: payMethod === 'credit' ? dueDate : '',
-        completedAt,
-        cash: cashPaid,
-        change: changeDue,
-      });
-
-      await onCreateTransaction({
+      // Create transaction first so we get the sequential OR number
+      const txn = await onCreateTransaction({
         items: selectedOrder.items,
         cash: cashPaid,
         change: changeDue,
@@ -140,6 +126,17 @@ export default function Orders({ orders, currentUser, onUpdateOrder, onCreateTra
         customer: selectedOrder.customer,
         dueDate: payMethod === 'credit' ? dueDate : '',
         orderId: selectedOrder.id,
+      });
+
+      // Update order with completed status + OR number from the transaction
+      await onUpdateOrder(selectedOrder.id, {
+        status: 'completed',
+        paymentMethod: payMethod,
+        dueDate: payMethod === 'credit' ? dueDate : '',
+        completedAt,
+        cash: cashPaid,
+        change: changeDue,
+        orNumber: txn?.orNumber || '',
       });
 
       if (payMethod === 'cash') {
@@ -160,15 +157,21 @@ export default function Orders({ orders, currentUser, onUpdateOrder, onCreateTra
     setPrintStatus('');
     try {
       await printViaBluetooth({
-        ...STORE_INFO,
-        txnId: order.id,
-        date: order.completedAt || order.date,
-        time: order.time,
-        cashierName: order.cashierName,
-        items: order.items,
-        total: order.subtotal,
-        cash: order.cash || order.subtotal,
-        change: order.change || 0,
+        storeName:     settings.storeName,
+        address:       settings.address,
+        phone:         settings.phone,
+        footer:        settings.receiptFooter,
+        orNumber:      order.orNumber,
+        txnId:         order.id,
+        date:          order.completedAt || order.date,
+        time:          order.time,
+        cashierName:   order.cashierName,
+        items:         order.items,
+        total:         order.subtotal,
+        paymentMethod: order.paymentMethod,
+        cash:          order.cash || order.subtotal,
+        change:        order.change || 0,
+        customer:      order.customer,
       }, setPrintStatus);
     } catch (err) {
       setPrintStatus('Error: ' + err.message);
@@ -411,18 +414,15 @@ export default function Orders({ orders, currentUser, onUpdateOrder, onCreateTra
               <div className="modal-body p-0">
                 <div className="receipt-preview p-3">
                   <div className="text-center mb-2">
-                    <strong className="fs-6">{STORE_INFO.storeName}</strong><br />
-                    <small className="text-muted">{STORE_INFO.address}</small><br />
-                    <small className="text-muted">{STORE_INFO.phone}</small>
+                    <strong className="fs-6">{settings.storeName}</strong><br />
+                    <small className="text-muted">{settings.address}</small><br />
+                    <small className="text-muted">{settings.phone}</small>
                   </div>
                   <hr className="receipt-dashed" />
                   <div className="small mb-2">
-                    <div className="d-flex justify-content-between"><span className="fw-bold">OR #:</span><span className="fw-bold">{viewReceiptOrder.orNumber || viewReceiptOrder.id?.slice(-8)}</span></div>
+                    <div className="d-flex justify-content-between fw-bold"><span>OR #:</span><span>{viewReceiptOrder.orNumber || viewReceiptOrder.id?.slice(-8)}</span></div>
                     <div className="d-flex justify-content-between"><span>Date:</span><span>{viewReceiptOrder.completedAt || viewReceiptOrder.date}</span></div>
                     <div className="d-flex justify-content-between"><span>Cashier:</span><span>{viewReceiptOrder.cashierName}</span></div>
-                    {viewReceiptOrder.customer?.name && (
-                      <div className="d-flex justify-content-between"><span>Customer:</span><span>{viewReceiptOrder.customer.name}</span></div>
-                    )}
                   </div>
                   <hr className="receipt-dashed" />
                   <table className="w-100 small mb-2">
@@ -430,31 +430,38 @@ export default function Orders({ orders, currentUser, onUpdateOrder, onCreateTra
                       {(viewReceiptOrder.items || []).map((item, i) => (
                         <tr key={i}>
                           <td>
-                            <div>{item.name}{item.variantName ? ` (${item.variantName})` : ''}</div>
-                            {item.qty > 1 && <div className="text-muted" style={{ fontSize: '0.68rem' }}>@ ₱{item.price} × {item.qty}</div>}
+                            <div className="fw-semibold">{item.name}{item.variantName ? ` (${item.variantName})` : ''}</div>
+                            <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+                              {item.qty} {item.unit} &times; &#8369;{Number(item.price).toFixed(2)}
+                            </div>
                           </td>
-                          <td className="text-end fw-semibold">₱{item.total}</td>
+                          <td className="text-end fw-semibold">&#8369;{Number(item.total).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   <hr className="receipt-dashed" />
-                  <div className="d-flex justify-content-between fw-bold mb-1"><span>TOTAL</span><span>₱{viewReceiptOrder.subtotal}</span></div>
-                  <div className="d-flex justify-content-between small text-muted">
-                    <span>Payment</span>
-                    <span>{(viewReceiptOrder.paymentMethod || '').toUpperCase()}</span>
-                  </div>
-                  {viewReceiptOrder.customer && (
+                  <div className="d-flex justify-content-between fw-bold mb-1"><span>SUBTOTAL</span><span>&#8369;{Number(viewReceiptOrder.subtotal).toFixed(2)}</span></div>
+                  <div className="d-flex justify-content-between small"><span>Payment</span><span className="text-capitalize">{viewReceiptOrder.paymentMethod || 'cash'}</span></div>
+                  {(viewReceiptOrder.paymentMethod === 'cash' || !viewReceiptOrder.paymentMethod) && viewReceiptOrder.cash != null && (
+                    <>
+                      <div className="d-flex justify-content-between small"><span>Cash</span><span>&#8369;{Number(viewReceiptOrder.cash).toFixed(2)}</span></div>
+                      <div className="d-flex justify-content-between small text-success fw-semibold"><span>Change</span><span>&#8369;{Number(viewReceiptOrder.change || 0).toFixed(2)}</span></div>
+                    </>
+                  )}
+                  {viewReceiptOrder.customer?.name && (
                     <>
                       <hr className="receipt-dashed" />
                       <div className="small text-muted">
-                        {viewReceiptOrder.customer.contact && <div>Contact: {viewReceiptOrder.customer.contact}</div>}
+                        <div className="fw-semibold text-dark mb-1">Customer</div>
+                        {viewReceiptOrder.customer.name && <div>Name: {viewReceiptOrder.customer.name}</div>}
+                        {viewReceiptOrder.customer.contact && <div>Tel: {viewReceiptOrder.customer.contact}</div>}
                         {viewReceiptOrder.customer.address && <div>Address: {viewReceiptOrder.customer.address}</div>}
                       </div>
                     </>
                   )}
                   <hr className="receipt-dashed" />
-                  <div className="text-center small text-muted">Salamat sa inyong pagbili!</div>
+                  <div className="text-center small text-muted">{settings.receiptFooter || 'Salamat sa inyong pagbili!'}</div>
                 </div>
                 {printStatus && (
                   <div className={`p-2 text-center small ${printStatus.includes('Error') ? 'text-danger' : 'text-success'}`}>

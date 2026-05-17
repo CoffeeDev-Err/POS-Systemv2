@@ -196,7 +196,7 @@ export default function CreditLedger({
         id: t.id,
         date: t.date,
         customerName: t.customer?.name || '—',
-        orNumber: t.id,
+        orNumber: t.orNumber || t.id,
         paymentMethod: t.paymentMethod,
         amount: t.subtotal || 0,
         type: 'transaction',
@@ -273,7 +273,7 @@ export default function CreditLedger({
       </div>
 
       {/* Tabs */}
-      <ul className="nav nav-tabs mb-4">
+      <ul className="nav nav-tabs mb-4 flex-row flex-nowrap">
         <li className="nav-item">
           <button
             className={`nav-link ${activeTab === 'credit' ? 'active' : ''}`}
@@ -405,7 +405,7 @@ export default function CreditLedger({
                       <tr key={`${row.type}-${row.id}`}>
                         <td>{row.date || '—'}</td>
                         <td>{row.customerName}</td>
-                        <td className="text-muted">{row.orNumber?.slice(-8) || '—'}</td>
+                        <td className="text-muted">{row.orNumber || row.id?.slice(-8) || '—'}</td>
                         <td>
                           <span className={`badge ${
                             row.paymentMethod === 'cash' ? 'bg-success' :

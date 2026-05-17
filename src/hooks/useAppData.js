@@ -6,6 +6,7 @@ import {
   fetchUsers,
   fetchSettings,
   fetchAuditLogs,
+  addAuditLog,
   fetchStockMovements,
   fetchExpenses,
   createProduct,
@@ -16,6 +17,7 @@ import {
   createUser,
   updateUser,
   updateUserStatus,
+  deleteUser,
   createTransaction,
   createStockMovement,
   createExpense,
@@ -26,6 +28,7 @@ import {
   fetchCredits,
   addCreditPayment,
   updateCreditDueDate,
+  voidTransaction,
 } from '../utils/api';
 
 const DEFAULT_SETTINGS = {
@@ -122,61 +125,82 @@ export function useAppData(currentUser) {
     });
   }, []);
 
+  const logAction = useCallback(async (action) => {
+    if (currentUser?.name) {
+      try { await addAuditLog(currentUser.name, action); } catch (_) {}
+    }
+  }, [currentUser]);
+
   const handleCreateProduct = useCallback(async (payload) => {
     const product = await createProduct(payload);
     setProducts(prev => [...prev, product]);
     setCategories(prev => (prev.includes(product.category) ? prev : [...prev, product.category]));
+    await logAction(`Created product "${payload.name}"`);
     await refreshAuditLogs();
     return product;
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
   const handleUpdateProduct = useCallback(async (id, payload) => {
     const product = await updateProduct(id, payload);
     setProducts(prev => prev.map(p => (p.id === product.id ? product : p)));
     setCategories(prev => (prev.includes(product.category) ? prev : [...prev, product.category]));
+    await logAction(`Updated product "${payload.name || id}"`);
     await refreshAuditLogs();
     return product;
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
-  const handleDeleteProduct = useCallback(async (id) => {
+  const handleDeleteProduct = useCallback(async (id, name) => {
     await deleteProduct(id);
     setProducts(prev => prev.filter(p => p.id !== id));
+    await logAction(`Deleted product "${name || id}"`);
     await refreshAuditLogs();
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
   const handleCreateCategory = useCallback(async (name) => {
     const res = await createCategory(name);
     setCategories(prev => (prev.includes(res.name) ? prev : [...prev, res.name]));
+    await logAction(`Created category "${name}"`);
     await refreshAuditLogs();
     return res;
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
   const handleDeleteCategory = useCallback(async (name, options) => {
     await deleteCategory(name, options);
     setCategories(prev => prev.filter(c => c !== name));
+    await logAction(`Deleted category "${name}"`);
     await refreshAuditLogs();
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
   const handleCreateUser = useCallback(async (payload) => {
     const user = await createUser(payload);
     setUsers(prev => [...prev, user]);
+    await logAction(`Created user "${payload.name}" (${payload.role})`);
     await refreshAuditLogs();
     return user;
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
   const handleUpdateUser = useCallback(async (id, payload) => {
     const user = await updateUser(id, payload);
     setUsers(prev => prev.map(u => (u.id === user.id ? user : u)));
+    await logAction(`Updated user "${payload.name || id}"`);
     await refreshAuditLogs();
     return user;
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
 
   const handleUpdateUserStatus = useCallback(async (id, payload) => {
     const user = await updateUserStatus(id, payload);
     setUsers(prev => prev.map(u => (u.id === user.id ? user : u)));
+    await logAction(`${user.active ? 'Activated' : 'Deactivated'} user "${user.name}"`);
     await refreshAuditLogs();
     return user;
-  }, [refreshAuditLogs]);
+  }, [logAction, refreshAuditLogs]);
+
+  const handleDeleteUser = useCallback(async (id, name) => {
+    await deleteUser(id);
+    setUsers(prev => prev.filter(u => u.id !== id));
+    await logAction(`Deleted user "${name || id}"`);
+    await refreshAuditLogs();
+  }, [logAction, refreshAuditLogs]);
 
   const handleCreateTransaction = useCallback(async (payload) => {
     const res = await createTransaction(payload);
@@ -195,9 +219,10 @@ export function useAppData(currentUser) {
     const res = await createStockMovement({ type: 'stock-in', ...payload });
     setStockMovements(prev => [...prev, res.movement]);
     mergeProducts([res.product]);
+    await logAction(`Stock-in: ${payload.qty} × "${payload.productName || payload.productId}"`);
     await refreshAuditLogs();
     return res;
-  }, [mergeProducts, refreshAuditLogs]);
+  }, [logAction, mergeProducts, refreshAuditLogs]);
 
   const handleCreateExpense = useCallback(async (payload) => {
     const expense = await createExpense(payload);
@@ -233,6 +258,18 @@ export function useAppData(currentUser) {
     const credit = await updateCreditDueDate(id, dueDate);
     setCredits(prev => prev.map(c => c.id === id ? credit : c));
     return credit;
+  }, []);
+
+  const handleVoidTransaction = useCallback(async (id, reason) => {
+    const { transaction, updatedProducts } = await voidTransaction(id, reason);
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, status: 'void', voidReason: reason, voidedAt: transaction.voidedAt } : t));
+    if (updatedProducts?.length) {
+      setProducts(prev => prev.map(p => {
+        const updated = updatedProducts.find(u => u.id === p.id);
+        return updated ? { ...p, stock: updated.stock } : p;
+      }));
+    }
+    return transaction;
   }, []);
 
   useEffect(() => {
@@ -292,6 +329,7 @@ export function useAppData(currentUser) {
     handleCreateUser,
     handleUpdateUser,
     handleUpdateUserStatus,
+    handleDeleteUser,
     handleCreateTransaction,
     handleStockIn,
     handleCreateExpense,
@@ -300,5 +338,6 @@ export function useAppData(currentUser) {
     handleUpdateOrder,
     handleAddCreditPayment,
     handleUpdateCreditDueDate,
+    handleVoidTransaction,
   };
 }

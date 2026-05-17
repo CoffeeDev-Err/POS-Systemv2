@@ -29,10 +29,11 @@ export async function login(username, password) {
   const snap = await getDocs(query(collection(db, "users"), where("username", "==", username)));
   if (snap.empty) throw new Error("Invalid username or password.");
   const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-  if (!userData.email) throw new Error("Account has no email configured.");
   if (userData.active === false) throw new Error("This account has been deactivated.");
 
-  await loginWithEmail(userData.email, password);
+  // Use stored email, or fall back to the synthetic email format used during account creation
+  const email = userData.email || `${username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.internal`;
+  await loginWithEmail(email, password);
   const user = { id: userData.id, ...userData };
   delete user.password;
 
@@ -67,6 +68,7 @@ export const fetchUsers = fs.fetchUsers;
 export const createUser = fs.createUser;
 export const updateUser = fs.updateUser;
 export const updateUserStatus = fs.updateUserStatus;
+export const deleteUser = fs.deleteUser;
 
 // ---- transactions ----
 export const fetchTransactions = fs.fetchTransactions;
@@ -92,6 +94,7 @@ export const createExpense = fs.createExpense;
 
 // ---- audit logs ----
 export const fetchAuditLogs = fs.fetchAuditLogs;
+export const addAuditLog = fs.addAuditLog;
 
 // ---- orders ----
 export const fetchOrders = fs.fetchOrders;
@@ -103,6 +106,15 @@ export const fetchCredits = fs.fetchCredits;
 export const createCredit = fs.createCredit;
 export const addCreditPayment = fs.addCreditPayment;
 export const updateCreditDueDate = fs.updateCreditDueDate;
+
+// ---- void transaction ----
+export async function voidTransaction(id, voidReason) {
+  const { updatedProducts, ...transaction } = await fs.voidTransaction(id, voidReason);
+  return { transaction, updatedProducts };
+}
+
+// ---- one-time OR number migration ----
+export const migrateOrNumbers = fs.migrateOrNumbers;
 
 // ---- password ----
 export const changePassword = (currentPassword, newPassword) => fbChangePassword(currentPassword, newPassword);

@@ -1,13 +1,31 @@
+import { initializeApp, getApps } from "firebase/app";
 import {
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  getAuth,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "./config";
+import app, { auth, db } from "./config";
+
+// Secondary Firebase app — used to create new Auth users without signing out the current admin
+function getSecondaryAuth() {
+  const existing = getApps().find(a => a.name === 'secondary');
+  if (existing) return getAuth(existing);
+  return getAuth(initializeApp(app.options, 'secondary'));
+}
+
+/** Creates a Firebase Auth account for a new POS user. Uses a secondary app so the admin session is preserved. */
+export async function createAuthUser(email, password) {
+  const secondaryAuth = getSecondaryAuth();
+  const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+  await signOut(secondaryAuth);
+  return cred.user.uid;
+}
 
 export async function loginWithEmail(email, password) {
   const cred = await signInWithEmailAndPassword(auth, email, password);

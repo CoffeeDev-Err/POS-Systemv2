@@ -9,13 +9,14 @@ const ROLE_INFO = {
 
 const EMPTY_USER = { name: '', username: '', password: '', role: 'cashier', active: true };
 
-export default function Users({ users, currentUser, auditLogs, onCreateUser, onUpdateUser, onUpdateUserStatus }) {
+export default function Users({ users, currentUser, auditLogs, onCreateUser, onUpdateUser, onUpdateUserStatus, onDeleteUser }) {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [form, setForm] = useState(EMPTY_USER);
   const [showPass, setShowPass] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
   const [toggleId, setToggleId] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [openLogUsers, setOpenLogUsers] = useState({});
@@ -58,10 +59,25 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
     setSaving(true);
     setError('');
     try {
-      await onUpdateUserStatus(id);
+      const target = users.find(u => u.id === id);
+      await onUpdateUserStatus(id, { active: !target?.active });
       setToggleId(null);
     } catch (err) {
       setError(err.message || 'Failed to update user.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setSaving(true);
+    setError('');
+    try {
+      const target = users.find(u => u.id === id);
+      await onDeleteUser(id, target?.name);
+      setDeleteId(null);
+    } catch (err) {
+      setError(err.message || 'Failed to delete user.');
     } finally {
       setSaving(false);
     }
@@ -172,6 +188,15 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                               aria-label={`${u.active ? 'Deactivate' : 'Activate'} ${u.name}`}
                             >
                               <i className={`bi ${u.active ? 'bi-person-x' : 'bi-person-check'}`}></i>
+                            </button>
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => setDeleteId(u.id)}
+                              disabled={isSelf}
+                              title="Delete user"
+                              aria-label={`Delete ${u.name}`}
+                            >
+                              <i className="bi bi-trash"></i>
                             </button>
                           </div>
                         </td>
@@ -294,6 +319,25 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                     : <><i className="bi bi-check2 me-2"></i>Save User</>
                   }
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {deleteId && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content">
+              <div className="modal-body text-center py-4">
+                <i className="bi bi-trash-fill text-danger fs-1 d-block mb-3"></i>
+                <h5>Delete user?</h5>
+                <p className="text-muted small">This cannot be undone. The user will be permanently removed.</p>
+              </div>
+              <div className="modal-footer justify-content-center gap-2">
+                <button className="btn btn-outline-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
+                <button className="btn btn-danger" onClick={() => handleDelete(deleteId)} disabled={saving}>Delete</button>
               </div>
             </div>
           </div>

@@ -3,12 +3,6 @@ import '../styles/pos.css';
 import '../styles/receipt.css';
 import { printViaBluetooth, openCashDrawerViaBluetooth } from '../utils/escpos';
 
-const STORE_INFO = {
-  storeName: "CARREN'S STORE",
-  address:   'Urdaneta, Ilocos',
-  phone:     '09XX-XXX-XXXX',
-};
-
 // Known category visual config — fallback palette for custom categories
 const KNOWN_CONFIG = {
   'Eggs':        { color: '#f59e0b' },
@@ -36,7 +30,7 @@ const POS_BLE_PROFILES = [
   { service: '0000ff00-0000-1000-8000-00805f9b34fb', characteristic: '0000ff02-0000-1000-8000-00805f9b34fb' },
 ];
 
-export default function POS({ products, currentUser, categories, onCreateTransaction, onCreateOrder }) {
+export default function POS({ products, currentUser, categories, settings, onCreateTransaction, onCreateOrder }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -313,15 +307,21 @@ export default function POS({ products, currentUser, categories, onCreateTransac
     setPrintStatus('');
     try {
       await printViaBluetooth({
-        ...STORE_INFO,
-        txnId:        lastTxn.id,
-        date:         lastTxn.date,
-        time:         lastTxn.time,
-        cashierName:  lastTxn.cashierName,
-        items:        lastTxn.items,
-        total:        lastTxn.subtotal,
-        cash:         lastTxn.cash,
-        change:       lastTxn.change,
+        storeName:     settings.storeName,
+        address:       settings.address,
+        phone:         settings.phone,
+        footer:        settings.receiptFooter,
+        orNumber:      lastTxn.orNumber,
+        txnId:         lastTxn.id,
+        date:          lastTxn.date,
+        time:          lastTxn.time,
+        cashierName:   lastTxn.cashierName,
+        items:         lastTxn.items,
+        total:         lastTxn.subtotal,
+        paymentMethod: lastTxn.paymentMethod,
+        cash:          lastTxn.cash,
+        change:        lastTxn.change,
+        customer:      lastTxn.customer,
       }, setPrintStatus);
     } catch (err) {
       setPrintStatus('Error: ' + err.message);
@@ -771,9 +771,9 @@ export default function POS({ products, currentUser, categories, onCreateTransac
               <div className="modal-body p-0">
                 <div className="receipt-preview">
                   <div className="text-center mb-2">
-                    <strong className="fs-6">{STORE_INFO.storeName}</strong><br />
-                    <small className="text-muted">{STORE_INFO.address}</small><br />
-                    <small className="text-muted">{STORE_INFO.phone}</small>
+                    <strong className="fs-6">{settings.storeName}</strong><br />
+                    <small className="text-muted">{settings.address}</small><br />
+                    <small className="text-muted">{settings.phone}</small>
                   </div>
                   <hr className="receipt-dashed" />
                   <div className="receipt-info">
@@ -788,20 +788,38 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                       {lastTxn.items.map((item, i) => (
                         <tr key={i}>
                           <td>
-                            <div>{item.name}</div>
-                            {item.qty > 1 && <div className="text-muted" style={{ fontSize: '0.68rem' }}>@ ₱{item.price} × {item.qty}</div>}
+                            <div className="fw-semibold">{item.name}{item.variantName ? ` (${item.variantName})` : ''}</div>
+                            <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+                              {item.qty} {item.unit} &times; &#8369;{Number(item.price).toFixed(2)}
+                            </div>
                           </td>
-                          <td className="text-end fw-semibold">₱{item.total}</td>
+                          <td className="text-end fw-semibold">&#8369;{Number(item.total).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   <hr className="receipt-dashed" />
-                  <div className="d-flex justify-content-between fw-bold"><span>TOTAL</span><span>₱{lastTxn.subtotal}</span></div>
-                  <div className="d-flex justify-content-between small"><span>CASH</span><span>₱{lastTxn.cash}</span></div>
-                  <div className="d-flex justify-content-between small text-success fw-semibold"><span>CHANGE</span><span>₱{lastTxn.change}</span></div>
+                  <div className="d-flex justify-content-between fw-bold"><span>SUBTOTAL</span><span>&#8369;{Number(lastTxn.subtotal).toFixed(2)}</span></div>
+                  <div className="d-flex justify-content-between small"><span>Payment</span><span className="text-capitalize">{lastTxn.paymentMethod || 'cash'}</span></div>
+                  {(lastTxn.paymentMethod === 'cash' || !lastTxn.paymentMethod) && (
+                    <>
+                      <div className="d-flex justify-content-between small"><span>Cash</span><span>&#8369;{Number(lastTxn.cash).toFixed(2)}</span></div>
+                      <div className="d-flex justify-content-between small text-success fw-semibold"><span>Change</span><span>&#8369;{Number(lastTxn.change).toFixed(2)}</span></div>
+                    </>
+                  )}
+                  {lastTxn.customer?.name && (
+                    <>
+                      <hr className="receipt-dashed" />
+                      <div className="small text-muted">
+                        <div className="fw-semibold text-dark mb-1">Customer</div>
+                        {lastTxn.customer.name && <div>Name: {lastTxn.customer.name}</div>}
+                        {lastTxn.customer.contact && <div>Tel: {lastTxn.customer.contact}</div>}
+                        {lastTxn.customer.address && <div>Address: {lastTxn.customer.address}</div>}
+                      </div>
+                    </>
+                  )}
                   <hr className="receipt-dashed" />
-                  <div className="text-center small text-muted">Salamat sa inyong pagbili!</div>
+                  <div className="text-center small text-muted">{settings.receiptFooter || 'Salamat sa inyong pagbili!'}</div>
                 </div>
                 {printStatus && (
                   <div className={`p-2 text-center small ${printStatus.includes('Error') ? 'text-danger bg-danger-subtle' : 'text-success bg-success-subtle'}`}>

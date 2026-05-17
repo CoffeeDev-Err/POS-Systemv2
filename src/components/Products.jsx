@@ -174,7 +174,8 @@ export default function Products({
     setSaving(true);
     setError('');
     try {
-      await onDeleteProduct(deleteId);
+      const productName = products.find(p => p.id === deleteId)?.name;
+      await onDeleteProduct(deleteId, productName);
       setDeleteId(null);
     } catch (err) {
       setError(err.message || 'Failed to delete product.');

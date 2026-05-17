@@ -79,7 +79,7 @@ export default function Reports({ transactions, products, expenses, currentUser,
   const handlePrintReport = () => {
     const rows = filteredTransactions.slice().reverse().map(t => `
       <tr>
-        <td>${t.id}</td>
+        <td>${t.orNumber || t.id}</td>
         <td>${t.date}</td>
         <td>${t.time}</td>
         <td>${t.cashierName}</td>
@@ -159,7 +159,7 @@ export default function Reports({ transactions, products, expenses, currentUser,
           : Number(item.cost || 0);
         const costTotal = cost * Number(item.qty || 0);
         rows.push([
-          txn.id,
+          txn.orNumber || txn.id,
           txn.date,
           txn.time,
           txn.cashierName,

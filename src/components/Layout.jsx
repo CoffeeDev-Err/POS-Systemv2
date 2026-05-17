@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { key: 'inventory', icon: 'bi-clipboard2-data', label: 'Inventory',  roles: ['superadmin', 'admin'] },
   { key: 'reports',   icon: 'bi-bar-chart-line',  label: 'Reports',    roles: ['superadmin', 'admin'] },
   { key: 'credits',   icon: 'bi-credit-card-2-front', label: 'Credit Ledger', roles: ['superadmin', 'admin'] },
+  { key: 'transactions', icon: 'bi-receipt-cutoff',   label: 'Transactions', roles: ['superadmin', 'admin'] },
   { key: 'users',     icon: 'bi-people',          label: 'Users',      roles: ['superadmin'] },
   { key: 'settings',  icon: 'bi-gear',            label: 'Settings',   roles: ['superadmin'] },
 ];

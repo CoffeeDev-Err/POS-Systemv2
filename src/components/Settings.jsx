@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { changePassword } from '../utils/api';
+import { changePassword, migrateOrNumbers } from '../utils/api';
 
 export default function Settings({ settings, onSaveSettings, currentUser }) {
   const [store, setStore] = useState({
@@ -17,6 +17,9 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
   const [pwError, setPwError] = useState('');
   const [pwSaved, setPwSaved] = useState(false);
   const [showPw, setShowPw] = useState(false);
+
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState(null);
 
   const handleChangePassword = async () => {
     setPwError('');
@@ -191,8 +194,44 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
 
         {/* Data & Backup (right) */}
         <div className="col-lg-6">
+          <div className="card card-custom mb-4">
+            <div className="card-header-custom"><i className="bi bi-arrow-repeat me-2"></i>OR Number Migration</div>
+            <div className="card-body">
+              <p className="text-muted small mb-3">
+                Re-assigns sequential OR numbers (<code>0000000001</code>, <code>0000000002</code>, &hellip;) to <strong>all</strong> transactions in chronological order and resets the counter. Run this once to fix any gaps or wrong numbers.
+              </p>
+              {migrateResult !== null && (
+                <div className={`alert py-2 small mb-3 ${migrateResult === 0 ? 'alert-info' : 'alert-success'}`}>
+                  {migrateResult === 0
+                    ? 'No transactions found.'
+                    : `Done! ${migrateResult} transaction${migrateResult > 1 ? 's' : ''} re-numbered from 0000000001.`}
+                </div>
+              )}
+              <button
+                className="btn btn-outline-dark"
+                disabled={migrating}
+                onClick={async () => {
+                  setMigrating(true);
+                  setMigrateResult(null);
+                  try {
+                    const count = await migrateOrNumbers();
+                    setMigrateResult(count);
+                  } catch (err) {
+                    setMigrateResult(`Error: ${err.message}`);
+                  } finally {
+                    setMigrating(false);
+                  }
+                }}
+              >
+                {migrating
+                  ? <><span className="spinner-border spinner-border-sm me-2"></span>Migrating...</>
+                  : <><i className="bi bi-123 me-2"></i>Fix Old OR Numbers</>}
+              </button>
+            </div>
+          </div>
+
           <div className="card card-custom">
-            <div className="card-header-custom"><i className="bi bi-database me-2"></i>Data & Backup</div>
+            <div className="card-header-custom"><i className="bi bi-database me-2"></i>Data &amp; Backup</div>
             <div className="card-body">
               <p className="text-muted small mb-3">Export your data as a backup file, or restore from a previous backup.</p>
               <div className="d-flex gap-2">
