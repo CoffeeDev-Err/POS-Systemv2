@@ -878,22 +878,6 @@ body[data-theme="dark"] .store-name {
   color: #e6eaee;
 }
 
-body[data-theme="dark"] .store-sub {
-  color: #97a3af;
-}
-
-body[data-theme="dark"] .login-btn {
-  background: #1f2a33;
-}
-
-body[data-theme="dark"] .login-btn:hover {
-  background: #28333d;
-}
-
-body[data-theme="dark"] .role-btn-active {
-  background: #1a222a;
-}
-
 body[data-theme="dark"] .theme-toggle {
   background: #1a222a;
 }
@@ -1072,4 +1056,48 @@ body[data-theme="dark"] .alert-success {
   background-color: #12231a;
   border-color: #1e3a2a;
   color: #b8e2c6;
+}
+
+/* Nav tabs */
+body[data-theme="dark"] .nav-tabs {
+  border-color: var(--border);
+}
+
+body[data-theme="dark"] .nav-tabs .nav-link {
+  color: var(--text-muted);
+  border-color: transparent;
+}
+
+body[data-theme="dark"] .nav-tabs .nav-link:hover {
+  color: var(--text-main);
+  border-color: var(--border) var(--border) transparent;
+  background: transparent;
+}
+
+body[data-theme="dark"] .nav-tabs .nav-link.active {
+  background: var(--card-bg);
+  color: var(--accent);
+  border-color: var(--border) var(--border) var(--card-bg);
+}
+
+/* Dropdowns */
+body[data-theme="dark"] .dropdown-menu {
+  background: #1a2228;
+  border-color: var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  color: var(--text-main);
+}
+
+body[data-theme="dark"] .dropdown-item {
+  color: var(--text-main);
+}
+
+body[data-theme="dark"] .dropdown-item:hover,
+body[data-theme="dark"] .dropdown-item:focus {
+  background: #222c34;
+  color: var(--text-main);
+}
+
+body[data-theme="dark"] .dropdown-divider {
+  border-color: var(--border);
 }
