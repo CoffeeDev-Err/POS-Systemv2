@@ -449,6 +449,37 @@ body[data-theme="dark"] .pcr-price {
   color: #e6eaee;
 }
 
+body[data-theme="dark"] .qty-btn {
+  background: #1a2228;
+  border-color: var(--border);
+  color: #e4eaee;
+}
+
+body[data-theme="dark"] .stock-badge.ok {
+  background: rgba(25, 135, 84, 0.25);
+  color: #86efac;
+}
+
+body[data-theme="dark"] .stock-badge.low {
+  background: rgba(133, 100, 4, 0.25);
+  color: #fcd34d;
+}
+
+body[data-theme="dark"] .stock-badge.out {
+  background: rgba(132, 32, 41, 0.25);
+  color: #fca5a5;
+}
+
+body[data-theme="dark"] .change-display {
+  background: rgba(25, 135, 84, 0.2);
+  color: #86efac;
+}
+
+body[data-theme="dark"] .change-display.insufficient {
+  background: rgba(220, 53, 69, 0.2);
+  color: #fca5a5;
+}
+
 @media (max-width: 767.98px) {
   .pos-layout {
     flex-direction: column;

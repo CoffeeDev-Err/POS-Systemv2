@@ -800,6 +800,62 @@ body[data-theme="dark"] {
   --shadow-md: 0 4px 18px rgba(0, 0, 0, 0.4);
   --skeleton-base: #1a2228;
   --skeleton-highlight: rgba(255, 255, 255, 0.07);
+
+  /* Bootstrap 5.3 CSS variable overrides — fixes all BS components using var(--bs-*) */
+  --bs-body-bg: #0f1418;
+  --bs-body-bg-rgb: 15, 20, 24;
+  --bs-body-color: #e4eaee;
+  --bs-body-color-rgb: 228, 234, 238;
+  --bs-secondary-bg: #1a2228;
+  --bs-secondary-bg-rgb: 26, 34, 40;
+  --bs-tertiary-bg: #141a1f;
+  --bs-tertiary-bg-rgb: 20, 26, 31;
+  --bs-border-color: #222c34;
+  --bs-border-color-translucent: rgba(255, 255, 255, 0.1);
+  --bs-emphasis-color: #e4eaee;
+  --bs-secondary-color: rgba(228, 234, 238, 0.75);
+  --bs-tertiary-color: rgba(228, 234, 238, 0.5);
+  --bs-heading-color: #e4eaee;
+  --bs-link-color: #0d9488;
+  --bs-link-hover-color: #14b8a6;
+  --bs-link-color-rgb: 13, 148, 136;
+  --bs-card-bg: #141a1f;
+  --bs-card-border-color: #222c34;
+  --bs-card-cap-bg: rgba(255, 255, 255, 0.03);
+  --bs-modal-bg: #141a1f;
+  --bs-modal-header-border-color: #222c34;
+  --bs-offcanvas-bg: #141a1f;
+  --bs-nav-tabs-border-color: #222c34;
+  --bs-nav-tabs-link-active-bg: #141a1f;
+  --bs-nav-tabs-link-active-color: #0d9488;
+  --bs-nav-tabs-link-active-border-color: #222c34 #222c34 #141a1f;
+  --bs-dropdown-bg: #1a2228;
+  --bs-dropdown-border-color: #222c34;
+  --bs-dropdown-link-color: #e4eaee;
+  --bs-dropdown-link-hover-bg: #222c34;
+  --bs-dropdown-link-hover-color: #e4eaee;
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.025);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+  --bs-table-border-color: #222c34;
+  --bs-table-color: #e4eaee;
+  --bs-list-group-bg: #141a1f;
+  --bs-list-group-border-color: #222c34;
+  --bs-list-group-color: #e4eaee;
+  --bs-list-group-hover-bg: #1a2228;
+  --bs-input-btn-focus-color: rgba(13, 148, 136, 0.25);
+  --bs-form-control-bg: #12181d;
+  --bs-form-control-disabled-bg: #1a2228;
+  --bs-form-select-bg: #12181d;
+  --bs-form-select-indicator-color: #8fa0af;
+  --bs-badge-color: #fff;
+  --bs-tooltip-bg: #1a2228;
+  --bs-tooltip-color: #e4eaee;
+  --bs-popover-bg: #1a2228;
+  --bs-popover-border-color: #222c34;
+  --bs-popover-header-bg: #141a1f;
+  --bs-popover-header-color: #e4eaee;
+  --bs-popover-body-color: #e4eaee;
 }
 
 body[data-theme="dark"] .top-header {
