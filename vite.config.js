@@ -14,7 +14,7 @@ export default defineConfig({
           if (id.includes('node_modules/firebase')) {
             return 'firebase-vendor';
           }
-          if (id.includes('node_modules/bootstrap')) {
+          if (id.includes('node_modules/bootstrap') && !id.includes('bootstrap-icons')) {
             return 'bootstrap';
           }
         },
