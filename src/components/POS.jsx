@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import '../styles/pos.css';
 import '../styles/receipt.css';
-import { printViaBluetooth } from '../utils/escpos';
+import { printViaBluetooth, openCashDrawerViaBluetooth } from '../utils/escpos';
 
 const STORE_INFO = {
   storeName: "CARREN'S STORE",
@@ -36,7 +36,7 @@ const POS_BLE_PROFILES = [
   { service: '0000ff00-0000-1000-8000-00805f9b34fb', characteristic: '0000ff02-0000-1000-8000-00805f9b34fb' },
 ];
 
-export default function POS({ products, currentUser, categories, onCreateTransaction }) {
+export default function POS({ products, currentUser, categories, onCreateTransaction, onCreateOrder }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -49,6 +49,17 @@ export default function POS({ products, currentUser, categories, onCreateTransac
   const [printStatus, setPrintStatus]   = useState('');
   const [isPrinting, setIsPrinting]     = useState(false);
   const [processError, setProcessError] = useState('');
+  const [variantPick, setVariantPick]   = useState(null); // { product } or null
+  const [priceTier, setPriceTier]       = useState('retail'); // 'retail' | 'wholesale'
+
+  // Multi-step transaction flow
+  const [posStep, setPosStep]           = useState('cart'); // 'cart' | 'review' | 'customer' | 'payment'
+  const [customerForm, setCustomerForm] = useState({ name: '', contact: '', address: '', notes: '' });
+  const [payNowMethod, setPayNowMethod] = useState('cash'); // 'cash' | 'gcash' | 'bank' | 'credit' | 'paylater'
+  const [dueDate, setDueDate]           = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showPayLaterModal, setShowPayLaterModal] = useState(false);
+  const [lastPayLaterOrder, setLastPayLaterOrder] = useState(null);
 
   // Bluetooth POS device state
   const [btStatus, setBtStatus]   = useState('disconnected'); // disconnected | connecting | connected | error
@@ -167,57 +178,133 @@ export default function POS({ products, currentUser, categories, onCreateTransac
 
   const removeItem = (idx) => setIncomingCart(prev => prev.filter((_, i) => i !== idx));
 
-  const handleAddProduct = (product) => {
-    if (product.stock <= 0) {
-      setProcessError('Out of stock.');
+  const resetCart = () => {
+    setIncomingCart([]);
+    setCashInput('');
+    setPosStep('cart');
+    setCustomerForm({ name: '', contact: '', address: '', notes: '' });
+    setPayNowMethod('cash');
+    setDueDate('');
+    setProcessError('');
+  };
+
+  const isProcessDisabled = () => {
+    if (incomingCart.length === 0 || isProcessing) return true;
+    if (payNowMethod === 'cash') return !cashInput || change < 0;
+    if (payNowMethod === 'credit') return !dueDate;
+    return false;
+  };
+
+  const handleProcessPayment = async () => {
+    if (incomingCart.length === 0) return;
+    setProcessError('');
+    setIsProcessing(true);
+    try {
+      if (payNowMethod === 'paylater') {
+        const order = await onCreateOrder({
+          items: incomingCart.map(i => ({ ...i })),
+          customer: customerForm,
+          notes: customerForm.notes,
+          paymentMethod: 'paylater',
+          dueDate,
+          cashierId: currentUser.id,
+          status: 'pending',
+        });
+        setLastPayLaterOrder(order);
+        setShowPayLaterModal(true);
+        resetCart();
+      } else {
+        const cashPaid = payNowMethod === 'cash' ? (parseFloat(cashInput) || 0) : subtotal;
+        const changeDue = payNowMethod === 'cash' ? cashPaid - subtotal : 0;
+        const txn = await onCreateTransaction({
+          items: incomingCart.map(i => ({ ...i })),
+          cash: cashPaid,
+          change: changeDue,
+          cashierId: currentUser.id,
+          paymentMethod: payNowMethod,
+          customer: customerForm,
+          dueDate: payNowMethod === 'credit' ? dueDate : '',
+        });
+        if (payNowMethod === 'cash') {
+          openCashDrawerViaBluetooth().catch(() => {});
+        }
+        setLastTxn(txn);
+        setShowReceipt(true);
+        resetCart();
+      }
+    } catch (err) {
+      setProcessError(err.message || 'Failed to process.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAddProduct = (product, variant = null) => {
+    // Resolve prices from variant or product, with backward-compat fallback to `price`
+    const src = variant || product;
+    const priceRetail    = Number(src.priceRetail ?? src.price ?? 0);
+    const priceWholesale = Number(src.priceWholesale ?? priceRetail);
+    const unit           = variant ? variant.unit                   : product.unit;
+    const conversionRate = variant ? (Number(variant.conversionRate) || 1) : (Number(product.conversionRate) || 1);
+    const variantId      = variant ? variant.id   : null;
+    const variantName    = variant ? variant.name : null;
+
+    // Helper: resolve tier for a given qty (auto-wholesale threshold)
+    const resolveTier = (qty) => {
+      if (priceTier === 'wholesale') return 'wholesale';
+      const threshold = Number(src.wholesaleQtyThreshold) || 0;
+      return (threshold > 0 && qty >= threshold) ? 'wholesale' : 'retail';
+    };
+
+    // Stock check: for variant products stock is in base units shared across all variants.
+    const inCartBaseUnits = incomingCart
+      .filter(i => i.productId === product.id)
+      .reduce((sum, i) => sum + (i.qty * (Number(i.conversionRate) || 1)), 0);
+    const availableBaseUnits = (product.stock || 0) - inCartBaseUnits;
+
+    if (availableBaseUnits < conversionRate) {
+      setProcessError('Not enough stock for this item.');
       return;
     }
 
     setProcessError('');
+    setPosStep('cart');
     setIncomingCart(prev => {
-      const idx = prev.findIndex(i => i.name === product.name);
+      // Cart key: productId-variantId for variants, productId alone otherwise
+      const cartKey = variantId ? `${product.id}-${variantId}` : String(product.id);
+      const idx = prev.findIndex(i => {
+        const k = i.variantId ? `${i.productId}-${i.variantId}` : String(i.productId);
+        return k === cartKey;
+      });
+
       if (idx >= 0) {
         const nextQty = prev[idx].qty + 1;
-        if (nextQty > product.stock) {
+        const otherBaseUnits = inCartBaseUnits - prev[idx].qty * conversionRate;
+        if (otherBaseUnits + nextQty * conversionRate > product.stock) {
           setProcessError('Not enough stock for this item.');
           return prev;
         }
+        const tier = resolveTier(nextQty);
+        const resolvedPrice = tier === 'wholesale' ? priceWholesale : priceRetail;
         const next = [...prev];
-        next[idx] = {
-          ...next[idx],
-          qty: nextQty,
-          total: Number((nextQty * product.price).toFixed(2)),
-        };
+        next[idx] = { ...next[idx], qty: nextQty, price: resolvedPrice, priceTier: tier, total: Number((nextQty * resolvedPrice).toFixed(2)) };
         return next;
       }
+      const tier = resolveTier(1);
+      const resolvedPrice = tier === 'wholesale' ? priceWholesale : priceRetail;
       return [...prev, {
         productId: product.id,
-        name: product.name,
-        price: product.price,
-        qty: 1,
-        total: Number(product.price),
+        name:      product.name,
+        variantId,
+        variantName,
+        price:     resolvedPrice,
+        priceTier: tier,
+        unit,
+        conversionRate,
+        qty:   1,
+        total: Number(resolvedPrice),
       }];
     });
-  };
-
-  const handleProcess = async () => {
-    if (incomingCart.length === 0 || cash < subtotal) return;
-    setPrintStatus('');
-    setProcessError('');
-    try {
-      const txn = await onCreateTransaction({
-        items: incomingCart.map(i => ({ ...i })),
-        cash,
-        change,
-        cashierId: currentUser.id,
-      });
-      setLastTxn(txn);
-      setShowReceipt(true);
-      setIncomingCart([]);
-      setCashInput('');
-    } catch (err) {
-      setProcessError(err.message || 'Failed to process transaction.');
-    }
   };
 
   const handlePrintBT = async () => {
@@ -252,7 +339,21 @@ export default function POS({ products, currentUser, categories, onCreateTransac
           <div className="pos-products-title">
             <i className="bi bi-grid-3x3-gap me-2"></i>Product Reference
           </div>
-          <div className="d-flex gap-1">
+          <div className="d-flex gap-2 align-items-center">
+            <div className="btn-group btn-group-sm" role="group" aria-label="Price tier">
+              <button
+                type="button"
+                className={`btn ${priceTier === 'retail' ? 'btn-dark' : 'btn-outline-secondary'}`}
+                onClick={() => setPriceTier('retail')}
+                title="Retail pricing"
+              >Retail</button>
+              <button
+                type="button"
+                className={`btn ${priceTier === 'wholesale' ? 'btn-warning text-dark' : 'btn-outline-secondary'}`}
+                onClick={() => setPriceTier('wholesale')}
+                title="Wholesale pricing"
+              >W/S</button>
+            </div>
             <div className="input-group input-group-sm" style={{ maxWidth: 200 }}>
               <span className="input-group-text bg-light"><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }}></i></span>
               <input
@@ -321,7 +422,8 @@ export default function POS({ products, currentUser, categories, onCreateTransac
 
         {/* Cart Header */}
         <div className="cart-header">
-          <i className="bi bi-receipt me-2"></i>Current Transaction
+          <i className={`bi ${posStep === 'cart' ? 'bi-receipt' : posStep === 'review' ? 'bi-eye' : posStep === 'customer' ? 'bi-person' : 'bi-credit-card'} me-2`}></i>
+          {posStep === 'cart' ? 'Current Transaction' : posStep === 'review' ? 'Review Order' : posStep === 'customer' ? 'Customer Details' : 'Payment'}
           <div className="d-flex gap-1 ms-auto">
             {btStatus !== 'connected' ? (
               <button
@@ -341,93 +443,315 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                 Bluetooth
               </button>
             )}
-            {incomingCart.length > 0 && (
-              <button className="btn btn-link text-danger p-0 small" onClick={() => { setIncomingCart([]); setCashInput(''); }}>
+            {incomingCart.length > 0 && posStep === 'cart' && (
+              <button className="btn btn-link text-danger p-0 small" onClick={resetCart}>
                 <i className="bi bi-trash me-1"></i>Clear
               </button>
             )}
           </div>
         </div>
 
-        {processError && (
-          <div className="alert alert-danger py-2 small mt-2">
-            <i className="bi bi-exclamation-circle me-1"></i>{processError}
-          </div>
+        {/* ── Step: CART ── */}
+        {posStep === 'cart' && (
+          <>
+            {processError && (
+              <div className="alert alert-danger py-2 small mt-2 mx-2">
+                <i className="bi bi-exclamation-circle me-1"></i>{processError}
+              </div>
+            )}
+            <div className="cart-items">
+              {incomingCart.length === 0 ? (
+                <div className="empty-cart">
+                  <i className="bi bi-pc-display-horizontal fs-1 text-muted"></i>
+                  <p className="text-muted mt-2 mb-0 small">
+                    No transaction received yet.<br />
+                    Connect the POS machine via Bluetooth<br />to sync items automatically.
+                  </p>
+                </div>
+              ) : (
+                incomingCart.map((item, idx) => (
+                  <div key={idx} className="cart-item">
+                    <div className="cart-item-info">
+                      <div className="cart-item-name">
+                        {item.name}
+                        {item.variantName && (
+                          <span className="text-muted small ms-1">({item.variantName})</span>
+                        )}
+                      </div>
+                      <div className="cart-item-price text-muted small">
+                        ₱{item.price} × {item.qty} {item.unit && <span>({item.unit})</span>}
+                        {item.priceTier === 'wholesale' && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>W/S</span>}
+                      </div>
+                    </div>
+                    <div className="cart-item-controls">
+                      <span className="cart-item-total">₱{item.total}</span>
+                      <button
+                        className="btn btn-link text-danger p-0 ms-1"
+                        onClick={() => removeItem(idx)}
+                        aria-label={`Remove ${item.name}`}
+                      >
+                        <i className="bi bi-x-circle-fill"></i>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="cart-payment">
+              <div className="d-flex justify-content-between mb-2">
+                <span className="fs-6 fw-semibold">Total</span>
+                <span className="fs-5 fw-bold text-dark">₱{subtotal.toLocaleString()}</span>
+              </div>
+              <button
+                className="btn btn-process w-100 mt-2"
+                onClick={() => setPosStep('review')}
+                disabled={incomingCart.length === 0}
+              >
+                <i className="bi bi-eye-fill me-2"></i>Review Order
+              </button>
+            </div>
+          </>
         )}
 
-        {/* Cart Items */}
-        <div className="cart-items">
-          {incomingCart.length === 0 ? (
-            <div className="empty-cart">
-              <i className="bi bi-pc-display-horizontal fs-1 text-muted"></i>
-              <p className="text-muted mt-2 mb-0 small">
-                No transaction received yet.<br />
-                Connect the POS machine via Bluetooth<br />to sync items automatically.
-              </p>
-            </div>
-          ) : (
-            incomingCart.map((item, idx) => (
-              <div key={idx} className="cart-item">
-                <div className="cart-item-info">
-                  <div className="cart-item-name">{item.name}</div>
-                  <div className="cart-item-price text-muted small">
-                    ₱{item.price} × {item.qty}
+        {/* ── Step: REVIEW ── */}
+        {posStep === 'review' && (
+          <>
+            <div className="cart-items">
+              {incomingCart.map((item, idx) => (
+                <div key={idx} className="cart-item">
+                  <div className="cart-item-info">
+                    <div className="cart-item-name">
+                      {item.name}
+                      {item.variantName && <span className="text-muted small ms-1">({item.variantName})</span>}
+                    </div>
+                    <div className="cart-item-price text-muted small">
+                      ₱{item.price} × {item.qty} {item.unit && <span>({item.unit})</span>}
+                      {item.priceTier === 'wholesale' && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>W/S</span>}
+                    </div>
+                  </div>
+                  <div className="cart-item-controls">
+                    <span className="cart-item-total">₱{item.total}</span>
                   </div>
                 </div>
-                <div className="cart-item-controls">
-                  <span className="cart-item-total">₱{item.total}</span>
-                  <button
-                    className="btn btn-link text-danger p-0 ms-1"
-                    onClick={() => removeItem(idx)}
-                    aria-label={`Remove ${item.name}`}
-                  >
-                    <i className="bi bi-x-circle-fill"></i>
-                  </button>
+              ))}
+            </div>
+            <div className="cart-payment">
+              <div className="d-flex justify-content-between mb-3">
+                <span className="fs-6 fw-semibold">Total</span>
+                <span className="fs-5 fw-bold text-dark">₱{subtotal.toLocaleString()}</span>
+              </div>
+              <div className="d-flex gap-2">
+                <button className="btn btn-outline-secondary flex-fill" onClick={() => setPosStep('cart')}>
+                  <i className="bi bi-arrow-left me-1"></i>Back
+                </button>
+                <button className="btn btn-dark flex-fill" onClick={() => setPosStep('customer')}>
+                  Proceed<i className="bi bi-arrow-right ms-1"></i>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Step: CUSTOMER ── */}
+        {posStep === 'customer' && (
+          <>
+            <div className="cart-items p-3">
+              <h6 className="mb-3 fw-semibold"><i className="bi bi-person me-2"></i>Customer Details</h6>
+              <div className="mb-2">
+                <label className="form-label small fw-semibold mb-1">Name <span className="text-danger">*</span></label>
+                <input type="text" className="form-control form-control-sm"
+                  value={customerForm.name}
+                  onChange={e => setCustomerForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Customer name" />
+              </div>
+              <div className="mb-2">
+                <label className="form-label small fw-semibold mb-1">Contact Number <span className="text-danger">*</span></label>
+                <input type="tel" className="form-control form-control-sm"
+                  value={customerForm.contact}
+                  onChange={e => setCustomerForm(f => ({ ...f, contact: e.target.value }))}
+                  placeholder="09XX-XXX-XXXX" />
+              </div>
+              <div className="mb-2">
+                <label className="form-label small fw-semibold mb-1">Address <span className="text-danger">*</span></label>
+                <input type="text" className="form-control form-control-sm"
+                  value={customerForm.address}
+                  onChange={e => setCustomerForm(f => ({ ...f, address: e.target.value }))}
+                  placeholder="Address" />
+              </div>
+              <div className="mb-2">
+                <label className="form-label small fw-semibold mb-1">Notes <span className="text-muted">(Optional)</span></label>
+                <textarea className="form-control form-control-sm" rows={2}
+                  value={customerForm.notes}
+                  onChange={e => setCustomerForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Order notes..." />
+              </div>
+            </div>
+            <div className="cart-payment">
+              <div className="d-flex gap-2">
+                <button className="btn btn-outline-secondary flex-fill" onClick={() => setPosStep('review')}>
+                  <i className="bi bi-arrow-left me-1"></i>Back
+                </button>
+                <button
+                  className="btn btn-dark flex-fill"
+                  disabled={!customerForm.name || !customerForm.contact || !customerForm.address}
+                  onClick={() => setPosStep('payment')}
+                >
+                  Confirm<i className="bi bi-arrow-right ms-1"></i>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Step: PAYMENT ── */}
+        {posStep === 'payment' && (
+          <>
+            <div className="cart-items p-3">
+              <div className="mb-1 fw-semibold small"><i className="bi bi-credit-card me-2"></i>Payment Options</div>
+              <div className="small text-muted mb-3">Total: <strong>₱{subtotal.toLocaleString()}</strong></div>
+
+              <div className="mb-3">
+                <div className="text-muted fw-semibold mb-2 text-uppercase" style={{ fontSize: '0.68rem', letterSpacing: '0.05em' }}>Pay Now</div>
+                {[
+                  { value: 'cash',   label: 'Cash' },
+                  { value: 'gcash',  label: 'GCash' },
+                  { value: 'bank',   label: 'Bank Transfer' },
+                  { value: 'credit', label: 'Credit' },
+                ].map(({ value, label }) => (
+                  <div key={value} className="form-check mb-1">
+                    <input className="form-check-input" type="radio" id={`pm-${value}`}
+                      checked={payNowMethod === value}
+                      onChange={() => { setPayNowMethod(value); setDueDate(''); }} />
+                    <label className="form-check-label small" htmlFor={`pm-${value}`}>{label}</label>
+                  </div>
+                ))}
+                {payNowMethod === 'cash' && (
+                  <div className="mt-2 ms-3">
+                    <label className="form-label small fw-semibold mb-1">Cash Received (₱)</label>
+                    <input type="number" className="form-control form-control-sm text-end fw-bold"
+                      placeholder="0.00" value={cashInput}
+                      onChange={e => setCashInput(e.target.value)} min="0" />
+                    {cashInput && (
+                      <div className={`change-display mt-1 ${change < 0 ? 'insufficient' : ''}`}>
+                        <span className="small">{change < 0 ? '⚠ Insufficient' : 'Change'}</span>
+                        <span className="fw-bold">{change < 0 ? `-₱${Math.abs(change).toFixed(2)}` : `₱${change.toFixed(2)}`}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {payNowMethod === 'credit' && (
+                  <div className="mt-2 ms-3">
+                    <label className="form-label small fw-semibold mb-1">Due Date <span className="text-danger">*</span></label>
+                    <input type="date" className="form-control form-control-sm"
+                      value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-muted fw-semibold mb-2 text-uppercase" style={{ fontSize: '0.68rem', letterSpacing: '0.05em' }}>Pay Later</div>
+                <div className="form-check mb-1">
+                  <input className="form-check-input" type="radio" id="pm-paylater"
+                    checked={payNowMethod === 'paylater'}
+                    onChange={() => { setPayNowMethod('paylater'); setDueDate(''); }} />
+                  <label className="form-check-label small" htmlFor="pm-paylater">
+                    Consignment / Reservation
+                  </label>
+                </div>
+                {payNowMethod === 'paylater' && (
+                  <div className="mt-2 ms-3">
+                    <label className="form-label small fw-semibold mb-1">Due Date <span className="text-muted">(Optional)</span></label>
+                    <input type="date" className="form-control form-control-sm"
+                      value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="cart-payment">
+              {processError && (
+                <div className="alert alert-danger py-2 small mb-2">
+                  <i className="bi bi-exclamation-circle me-1"></i>{processError}
+                </div>
+              )}
+              <div className="d-flex gap-2 mb-2">
+                <button className="btn btn-outline-secondary flex-fill" onClick={() => setPosStep('customer')}>
+                  <i className="bi bi-arrow-left me-1"></i>Back
+                </button>
+              </div>
+              <button
+                className={`btn w-100 ${payNowMethod === 'paylater' ? 'btn-warning text-dark' : 'btn-process'}`}
+                onClick={handleProcessPayment}
+                disabled={isProcessDisabled()}
+              >
+                {isProcessing
+                  ? <><span className="spinner-border spinner-border-sm me-2"></span>Processing...</>
+                  : payNowMethod === 'paylater'
+                    ? <><i className="bi bi-clock me-2"></i>Place Order (Pay Later)</>
+                    : <><i className="bi bi-check-circle-fill me-2"></i>Complete Payment</>
+                }
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ═════════════ Variant Picker Modal ═════════════ */}
+      {variantPick && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="bi bi-grid-3x3-gap me-2"></i>{variantPick.product.name}
+                </h5>
+                <button className="btn-close" onClick={() => setVariantPick(null)} aria-label="Close"></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-muted small mb-3">Select a size or type:</p>
+                <div className="d-flex flex-column gap-2">
+                  {(variantPick.product.variants || []).map(v => {
+                    const convRate = Number(v.conversionRate) || 1;
+                    const inCart = incomingCart
+                      .filter(i => i.productId === variantPick.product.id)
+                      .reduce((s, i) => s + i.qty * (Number(i.conversionRate) || 1), 0);
+                    const avail = variantPick.product.stock - inCart;
+                    const sellableQty = Math.floor(avail / convRate);
+                    const isOut = sellableQty <= 0;
+                    return (
+                      <button
+                        key={v.id}
+                        className={`btn btn-outline-secondary text-start ${isOut ? 'disabled opacity-50' : ''}`}
+                        disabled={isOut}
+                        onClick={() => {
+                          handleAddProduct(variantPick.product, v);
+                          setVariantPick(null);
+                        }}
+                      >
+                        <div className="fw-semibold">{v.name}</div>
+                        <div className="small text-muted">
+                          {(() => {
+                            const retail = Number(v.priceRetail ?? v.price ?? 0);
+                            const wholesale = Number(v.priceWholesale ?? retail);
+                            return priceTier === 'wholesale'
+                              ? <><span className="text-warning fw-semibold">₱{wholesale.toFixed(2)}</span> <span className="text-muted">(W/S)</span></>
+                              : <span>₱{retail.toFixed(2)}</span>;
+                          })()} / {v.unit}
+                          {' · '}
+                          {isOut ? <span className="text-danger">Out of stock</span> : <span>{sellableQty} available</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-
-        {/* Payment */}
-        <div className="cart-payment">
-          <div className="d-flex justify-content-between mb-2">
-            <span className="fs-6 fw-semibold">Total</span>
-            <span className="fs-5 fw-bold text-dark">₱{subtotal.toLocaleString()}</span>
-          </div>
-
-          <div className="mb-2">
-            <label className="form-label small fw-semibold mb-1">Cash Received (₱)</label>
-            <input
-              type="number"
-              className="form-control form-control-lg text-end fw-bold"
-              placeholder="0.00"
-              value={cashInput}
-              onChange={e => setCashInput(e.target.value)}
-              min="0"
-            />
-
-          </div>
-
-          {cashInput && (
-            <div className={`change-display ${change < 0 ? 'insufficient' : ''}`}>
-              <span>{change < 0 ? '⚠ Insufficient' : 'Change'}</span>
-              <span className="fs-4 fw-bold">
-                {change < 0 ? `-₱${Math.abs(change).toFixed(2)}` : `₱${change.toFixed(2)}`}
-              </span>
+              <div className="modal-footer">
+                <button className="btn btn-outline-secondary w-100" onClick={() => setVariantPick(null)}>Cancel</button>
+              </div>
             </div>
-          )}
-
-          <button
-            className="btn btn-process w-100 mt-3"
-            onClick={handleProcess}
-            disabled={incomingCart.length === 0 || !cashInput || change < 0}
-          >
-            <i className="bi bi-check-circle-fill me-2"></i>
-            Process & Save Transaction
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ═════════════ Receipt Modal ═════════════ */}
       {showReceipt && lastTxn && (
@@ -453,7 +777,7 @@ export default function POS({ products, currentUser, categories, onCreateTransac
                   </div>
                   <hr className="receipt-dashed" />
                   <div className="receipt-info">
-                    <div className="d-flex justify-content-between small"><span>TXN #:</span><span>{lastTxn.id}</span></div>
+                    <div className="d-flex justify-content-between small fw-bold"><span>OR #:</span><span>{lastTxn.orNumber || lastTxn.id?.slice(-8)}</span></div>
                     <div className="d-flex justify-content-between small"><span>Date:</span><span>{lastTxn.date}</span></div>
                     <div className="d-flex justify-content-between small"><span>Time:</span><span>{lastTxn.time}</span></div>
                     <div className="d-flex justify-content-between small"><span>Cashier:</span><span>{lastTxn.cashierName}</span></div>
@@ -500,6 +824,40 @@ export default function POS({ products, currentUser, categories, onCreateTransac
           </div>
         </div>
       )}
+
+      {/* Pay Later Success Modal */}
+      {showPayLaterModal && lastPayLaterOrder && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content">
+              <div className="modal-header" style={{ background: 'var(--accent)', color: '#fff' }}>
+                <h5 className="modal-title">
+                  <i className="bi bi-clock-fill me-2"></i>Order Placed!
+                </h5>
+                <button className="btn-close btn-close-white" onClick={() => setShowPayLaterModal(false)} />
+              </div>
+              <div className="modal-body">
+                <p className="mb-1 small">
+                  Order for <strong>{lastPayLaterOrder.customer?.name}</strong> has been placed as <strong>Pending</strong>.
+                </p>
+                <p className="mb-0 small text-muted">
+                  Go to <strong>Orders</strong> to accept and process it.
+                </p>
+                {lastPayLaterOrder.dueDate && (
+                  <p className="mb-0 small text-warning mt-1">
+                    <i className="bi bi-calendar-event me-1"></i>Due: {lastPayLaterOrder.dueDate}
+                  </p>
+                )}
+              </div>
+              <div className="modal-footer p-2">
+                <button className="btn btn-process w-100" onClick={() => setShowPayLaterModal(false)}>
+                  <i className="bi bi-check2 me-2"></i>OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -508,6 +866,28 @@ export default function POS({ products, currentUser, categories, onCreateTransac
     const isLow = product.stock > 0 && product.stock <= product.lowStockAlert;
     const isOut = product.stock <= 0;
     const productName = product.name.replace(/ *\([^)]*\) */g, " ");
+    const isVariant   = product.hasVariants;
+
+    // For variant products, show stock in base units
+    const stockLabel  = isVariant
+      ? `${product.stock} ${product.baseUnit || 'pc'}`
+      : product.stock;
+    const priceLabel  = isVariant
+      ? (() => {
+          const prices = (product.variants || []).map(v =>
+            priceTier === 'wholesale'
+              ? Number(v.priceWholesale ?? v.priceRetail ?? v.price ?? 0)
+              : Number(v.priceRetail ?? v.price ?? 0)
+          );
+          const minP = Math.min(...prices);
+          return priceTier === 'wholesale' ? `W/S ₱${minP.toFixed(2)}` : `from ₱${minP.toFixed(2)}`;
+        })()
+      : (() => {
+          const retail = Number(product.priceRetail ?? product.price ?? 0);
+          const wholesale = Number(product.priceWholesale ?? retail);
+          return priceTier === 'wholesale' ? `W/S ₱${wholesale.toFixed(2)}` : `₱${retail.toFixed(2)}`;
+        })();
+
     return (
       <div
         key={product.id}
@@ -519,26 +899,35 @@ export default function POS({ products, currentUser, categories, onCreateTransac
         onClick={() => {
           if (!isOut) {
             setSelectedProductId(product.id);
-            handleAddProduct(product);
+            if (product.hasVariants) {
+              setVariantPick({ product });
+            } else {
+              handleAddProduct(product);
+            }
           }
         }}
         onKeyDown={(e) => {
           if (isOut) return;
           if (e.key === 'Enter' || e.key === ' ') {
             setSelectedProductId(product.id);
-            handleAddProduct(product);
+            if (product.hasVariants) {
+              setVariantPick({ product });
+            } else {
+              handleAddProduct(product);
+            }
           }
         }}
       >
         <div className="pcr-name">{productName}</div>
-        <div className="pcr-price">₱{product.price}</div>
-        <div className="pcr-unit text-muted">/{product.unit}</div>
+        <div className="pcr-price">{priceLabel}</div>
+        {isVariant && <div className="pcr-unit text-muted" style={{ fontSize: '0.6rem', color: 'var(--accent)' }}>tap to pick variant</div>}
+        {!isVariant && <div className="pcr-unit text-muted">/{product.unit}</div>}
         {isOut ? (
           <span className="stock-badge out">OUT</span>
         ) : isLow ? (
-          <span className="stock-badge low">{product.stock}</span>
+          <span className="stock-badge low">{stockLabel}</span>
         ) : (
-          <span className="stock-badge ok">{product.stock}</span>
+          <span className="stock-badge ok">{stockLabel}</span>
         )}
       </div>
     );

@@ -1,6 +1,6 @@
 /* Login */
 .login-page {
-  background: linear-gradient(135deg, #2b3239 0%, #1a1f24 100%);
+  background: linear-gradient(145deg, #0d1f1d 0%, #0f1418 60%, #1a2028 100%);
   min-height: 100vh;
 }
 
@@ -16,14 +16,15 @@
 }
 
 .store-logo {
-  width: 72px;
-  height: 72px;
-  background: linear-gradient(135deg, #2b3239, #495057);
-  border-radius: 18px;
+  width: 76px;
+  height: 76px;
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.4);
 }
 
 .store-logo i {
@@ -45,16 +46,20 @@
 }
 
 .login-btn {
-  background: #1e2428;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
   border: none;
   padding: 0.75rem;
   font-weight: 700;
   font-size: 1rem;
   border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.35);
+  transition: all 0.15s;
 }
 
 .login-btn:hover {
-  background: #2d3539;
+  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.45);
 }
 
 .quick-btn {
@@ -100,7 +105,7 @@
 }
 
 body[data-theme="dark"] .login-page {
-  background: radial-gradient(1200px 800px at 70% -10%, #1f2a33, #0f1418 60%);
+  background: radial-gradient(1200px 800px at 70% -10%, #0a1f1d, #0f1418 60%);
 }
 
 body[data-theme="dark"] .login-card {
@@ -117,11 +122,11 @@ body[data-theme="dark"] .store-sub {
 }
 
 body[data-theme="dark"] .login-btn {
-  background: #1f2a33;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
 }
 
 body[data-theme="dark"] .login-btn:hover {
-  background: #28333d;
+  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
 }
 
 body[data-theme="dark"] .role-btn-active {

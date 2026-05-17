@@ -8,7 +8,7 @@ export default function TransactionDetailModal({ txn, onClose, formatCurrency })
       <div className="modal-dialog modal-dialog-centered modal-sm">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title small"><i className="bi bi-receipt me-2"></i>{txn.id}</h5>
+            <h5 className="modal-title small"><i className="bi bi-receipt me-2"></i>OR# {txn.orNumber || txn.id?.slice(-8)}</h5>
             <button className="btn-close" onClick={onClose} aria-label="Close"></button>
           </div>
           <div className="modal-body">

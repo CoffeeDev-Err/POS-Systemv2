@@ -30,3 +30,6 @@ serviceAccountKey.json
 *.njsproj
 *.sln
 *.sw?
+
+# Spec / planning files
+pos-changes-prompt.md

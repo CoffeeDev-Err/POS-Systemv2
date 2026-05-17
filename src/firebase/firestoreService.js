@@ -18,7 +18,7 @@ function serialize(data) {
 }
 const toList = (snap) => snap.docs.map(d => ({ id: d.id, ...serialize(d.data()) }));
 
-// --- products ---
+// --- products ---                     
 export const fetchProducts = () => getDocs(col("products")).then(toList);
 
 export async function createProduct(payload) {
@@ -119,13 +119,35 @@ export async function createTransaction(payload) {
     const pRef = doc(db, "products", String(item.productId));
     const pSnap = await getDoc(pRef);
     if (pSnap.exists()) {
-      const newStock = Math.max(0, (pSnap.data().stock || 0) - item.qty);
+      // conversionRate: how many base units (pcs) are deducted per selling unit.
+      // e.g. selling 2 trays where 1 tray = 30 pcs → deduct 60 pcs from stock.
+      const conversionRate = Number(item.conversionRate) || 1;
+      const baseQtyToDeduct = item.qty * conversionRate;
+      const newStock = Math.max(0, (pSnap.data().stock || 0) - baseQtyToDeduct);
       await updateDoc(pRef, { stock: newStock });
       updatedProducts.push({ id: item.productId, ...serialize(pSnap.data()), stock: newStock });
     }
   }
 
-  return { id: ref.id, ...docPayload, cashierName, updatedProducts };
+  // Auto-create credit ledger entry for credit-payment transactions
+  let credit = null;
+  if (payload.paymentMethod === 'credit') {
+    const customer = payload.customer || {};
+    credit = await createCredit({
+      transactionId: ref.id,
+      orNumber: ref.id,
+      customerName: customer.name || '',
+      customerContact: customer.contact || '',
+      customerAddress: customer.address || '',
+      items: payload.items || [],
+      totalAmount: subtotal,
+      dueDate: payload.dueDate || '',
+      cashierId: payload.cashierId || '',
+      cashierName,
+    });
+  }
+
+  return { id: ref.id, ...docPayload, cashierName, updatedProducts, credit };
 }
 
 // --- stock movements (also increments product stock) ---
@@ -153,8 +175,20 @@ export async function fetchSettings() {
 }
 
 export async function updateSettings(payload) {
-  await setDoc(doc(db, "settings", "global"), payload, { merge: true });
-  return payload;
+  // Remove undefined fields to avoid Firestore "unsupported field value: undefined" errors
+  const safe = {};
+  for (const [k, v] of Object.entries(payload || {})) {
+    if (v !== undefined) safe[k] = v;
+  }
+  if (Object.keys(safe).length === 0) {
+    // Nothing to update; return current settings
+    const snap = await getDoc(doc(db, "settings", "global"));
+    return snap.exists() ? snap.data() : {};
+  }
+
+  await setDoc(doc(db, "settings", "global"), safe, { merge: true });
+  const snap = await getDoc(doc(db, "settings", "global"));
+  return snap.exists() ? snap.data() : safe;
 }
 
 // --- expenses ---
@@ -174,3 +208,99 @@ export async function createExpense(payload) {
 // --- audit logs ---
 export const fetchAuditLogs = () =>
   getDocs(query(col("auditLogs"), orderBy("createdAt", "desc"))).then(toList);
+
+// --- orders ---
+export const fetchOrders = () =>
+  getDocs(query(col("orders"), orderBy("createdAt", "desc"))).then(toList);
+
+export async function createOrder(payload) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const date = `${year}-${month}-${day}`;
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const time = `${hours}:${minutes}`;
+
+  let cashierName = 'Unknown';
+  if (payload.cashierId) {
+    const userSnap = await getDoc(doc(db, 'users', payload.cashierId));
+    if (userSnap.exists()) cashierName = userSnap.data().name || 'Unknown';
+  }
+
+  const subtotal = (payload.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
+
+  const docPayload = {
+    status: 'pending',
+    ...payload,
+    date,
+    time,
+    subtotal,
+    cashierName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const ref = await addDoc(col('orders'), docPayload);
+  return { id: ref.id, ...docPayload, createdAt: date, updatedAt: date };
+}
+
+export async function updateOrder(id, updates) {
+  await updateDoc(doc(db, 'orders', id), { ...updates, updatedAt: serverTimestamp() });
+  const snap = await getDoc(doc(db, 'orders', id));
+  return { id, ...serialize(snap.data()) };
+}
+
+// --- credits ---
+export const fetchCredits = () =>
+  getDocs(query(col('credits'), orderBy('createdAt', 'desc'))).then(toList);
+
+export async function createCredit(payload) {
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const docPayload = {
+    ...payload,
+    amountPaid: 0,
+    remainingBalance: payload.totalAmount || 0,
+    status: 'unpaid',
+    payments: [],
+    startDate: payload.startDate || date,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  const ref = await addDoc(col('credits'), docPayload);
+  return { id: ref.id, ...docPayload, createdAt: date, updatedAt: date };
+}
+
+export async function addCreditPayment(id, amount, note = '') {
+  const credSnap = await getDoc(doc(db, 'credits', id));
+  if (!credSnap.exists()) throw new Error('Credit not found');
+  const data = credSnap.data();
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const newAmountPaid = (data.amountPaid || 0) + Number(amount);
+  const newRemaining = Math.max(0, (data.totalAmount || 0) - newAmountPaid);
+  const newStatus = newRemaining <= 0 ? 'paid' : 'partial';
+  const newPayments = [...(data.payments || []), { amount: Number(amount), date, note }];
+
+  const updates = {
+    amountPaid: newAmountPaid,
+    remainingBalance: newRemaining,
+    status: newStatus,
+    payments: newPayments,
+    updatedAt: serverTimestamp(),
+  };
+  if (newStatus === 'paid') updates.paidAt = serverTimestamp();
+
+  await updateDoc(doc(db, 'credits', id), updates);
+  const updated = await getDoc(doc(db, 'credits', id));
+  return { id, ...serialize(updated.data()) };
+}
+
+export async function updateCreditDueDate(id, dueDate) {
+  await updateDoc(doc(db, 'credits', id), { dueDate, updatedAt: serverTimestamp() });
+  const snap = await getDoc(doc(db, 'credits', id));
+  return { id, ...serialize(snap.data()) };
+}

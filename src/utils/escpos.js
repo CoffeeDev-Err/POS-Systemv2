@@ -148,6 +148,36 @@ export async function printViaBluetooth(receiptData, onStatus) {
   return true;
 }
 
+// Send cash drawer open ESC/POS command via Bluetooth (ESC p 0 25 250)
+export async function openCashDrawerViaBluetooth(onStatus) {
+  if (!navigator.bluetooth) {
+    throw new Error('Web Bluetooth not available.');
+  }
+  const drawerCmd = new Uint8Array([0x1b, 0x70, 0x00, 0x19, 0xfa]);
+  onStatus?.('Connecting to printer...');
+  const device = await navigator.bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: BLE_PROFILES.map(p => p.service),
+  });
+  const server = await device.gatt.connect();
+  let characteristic = null;
+  for (const profile of BLE_PROFILES) {
+    try {
+      const svc = await server.getPrimaryService(profile.service);
+      characteristic = await svc.getCharacteristic(profile.characteristic);
+      break;
+    } catch { continue; }
+  }
+  if (!characteristic) {
+    device.gatt.disconnect();
+    throw new Error('Could not find a compatible ESC/POS service.');
+  }
+  await characteristic.writeValue(drawerCmd);
+  device.gatt.disconnect();
+  onStatus?.('Cash drawer opened!');
+  return true;
+}
+
 // A4 report print using browser print dialog
 export function printA4Report(htmlContent, title = 'POS Report') {
   const win = window.open('', '_blank', 'width=900,height=700');

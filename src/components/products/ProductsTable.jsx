@@ -42,33 +42,74 @@ export default function ProductsTable({ products, onEdit, onDelete }) {
             </tr>
           </thead>
           <tbody>
-            {displayedProducts.map(p => (
-              <tr key={p.id}>
-                <td>
-                  <span className="fw-semibold">{p.name}</span>
-                </td>
-                <td><span className="badge bg-light text-dark border">{p.category}</span></td>
-                <td className="text-end">₱{p.price.toFixed(2)}</td>
-                <td className="text-end text-muted">₱{Number(p.cost || 0).toFixed(2)}</td>
-                <td className="text-center text-muted small">{p.unit}</td>
-                <td className="text-center">
-                  <span className={`badge ${p.stock === 0 ? 'bg-danger' : p.stock <= p.lowStockAlert ? 'bg-warning text-dark' : 'bg-success'}`}>
-                    {p.stock}
-                  </span>
-                </td>
-                <td className="text-center text-muted small">{p.lowStockAlert}</td>
-                <td className="text-center">
-                  <div className="d-flex gap-1 justify-content-center">
-                    <button className="btn btn-outline-secondary btn-sm" onClick={() => onEdit(p)} title="Edit">
-                      <i className="bi bi-pencil me-1"></i>Edit
-                    </button>
-                    <button className="btn btn-outline-danger btn-sm" onClick={() => onDelete(p.id)} title="Remove">
-                      <i className="bi bi-trash me-1"></i>Remove
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {displayedProducts.map(p => {
+              const isVariant = p.hasVariants;
+              const stockUnit = isVariant ? (p.baseUnit || 'pc') : p.unit;
+              const stockColor = p.stock === 0 ? 'bg-danger' : p.stock <= p.lowStockAlert ? 'bg-warning text-dark' : 'bg-success';
+              return (
+                <tr key={p.id}>
+                  <td>
+                    <span className="fw-semibold">{p.name}</span>
+                    {isVariant && (
+                      <div className="mt-1">
+                        {(p.variants || []).map(v => {
+                          const retail = Number(v.priceRetail ?? v.price ?? 0);
+                          const wholesale = v.priceWholesale ? Number(v.priceWholesale) : null;
+                          return (
+                            <span key={v.id} className="badge bg-info text-dark me-1 fw-normal" style={{ fontSize: '0.68rem' }}>
+                              {v.name} — ₱{retail.toFixed(2)}{wholesale ? ` / W₱${wholesale.toFixed(2)}` : ''}/{v.unit}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </td>
+                  <td><span className="badge bg-light text-dark border">{p.category}</span></td>
+                  <td className="text-end">
+                    {isVariant ? (() => {
+                      const prices = (p.variants || []).map(v => Number(v.priceRetail ?? v.price ?? 0));
+                      const wsP = (p.variants || []).map(v => v.priceWholesale ? Number(v.priceWholesale) : null).filter(Boolean);
+                      return (
+                        <div>
+                          <div className="text-muted small">from ₱{Math.min(...prices).toFixed(2)}</div>
+                          {wsP.length > 0 && <div className="text-warning small" style={{ fontSize: '0.7rem' }}>W/S ₱{Math.min(...wsP).toFixed(2)}</div>}
+                        </div>
+                      );
+                    })() : (
+                      <div>
+                        <div>₱{Number(p.priceRetail ?? p.price ?? 0).toFixed(2)}</div>
+                        {p.priceWholesale && <div className="text-warning small" style={{ fontSize: '0.7rem' }}>W/S ₱{Number(p.priceWholesale).toFixed(2)}</div>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="text-end text-muted">
+                    {isVariant ? '—' : `₱${Number(p.cost || 0).toFixed(2)}`}
+                  </td>
+                  <td className="text-center text-muted small">
+                    {isVariant
+                      ? <span className="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle">{p.variants?.length ?? 0} variants</span>
+                      : p.unit
+                    }
+                  </td>
+                  <td className="text-center">
+                    <span className={`badge ${stockColor}`}>
+                      {p.stock} {stockUnit}
+                    </span>
+                  </td>
+                  <td className="text-center text-muted small">{p.lowStockAlert} {stockUnit}</td>
+                  <td className="text-center">
+                    <div className="d-flex gap-1 justify-content-center">
+                      <button className="btn btn-outline-secondary btn-sm" onClick={() => onEdit(p)} title="Edit">
+                        <i className="bi bi-pencil me-1"></i>Edit
+                      </button>
+                      <button className="btn btn-outline-danger btn-sm" onClick={() => onDelete(p.id)} title="Remove">
+                        <i className="bi bi-trash me-1"></i>Remove
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {products.length === 0 && (
               <tr><td colSpan="8" className="text-center text-muted py-4">No products found</td></tr>
             )}

@@ -69,11 +69,11 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
   };
 
   return (
-    <div>
+    <div className="settings-page">
       <div className="row g-4">
         {/* Store Info */}
         <div className="col-lg-6">
-          <div className="card card-custom">
+          <div className="card card-custom card-data-backup">
             <div className="card-header-custom"><i className="bi bi-shop me-2"></i>Store Information</div>
             <div className="card-body">
               <div className="mb-3">
@@ -147,7 +147,7 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
           </div>
         </div>
 
-        {/* Printer Info */}
+        {/* Printer Info (left) */}
         <div className="col-lg-6">
           <div className="card card-custom mb-3">
             <div className="card-header-custom"><i className="bi bi-printer me-2"></i>Printer Configuration</div>
@@ -187,8 +187,10 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Backup */}
+        {/* Data & Backup (right) */}
+        <div className="col-lg-6">
           <div className="card card-custom">
             <div className="card-header-custom"><i className="bi bi-database me-2"></i>Data & Backup</div>
             <div className="card-body">

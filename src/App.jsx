@@ -9,6 +9,8 @@ const Inventory = lazy(() => import('./components/Inventory'));
 const Reports = lazy(() => import('./components/Reports'));
 const Users = lazy(() => import('./components/Users'));
 const Settings = lazy(() => import('./components/Settings'));
+const Orders = lazy(() => import('./components/Orders'));
+const CreditLedger = lazy(() => import('./components/CreditLedger'));
 
 import {
   login as apiLogin,
@@ -56,6 +58,12 @@ export default function App() {
     handleStockIn,
     handleCreateExpense,
     handleSaveSettings,
+    orders,
+    handleCreateOrder,
+    handleUpdateOrder,
+    credits,
+    handleAddCreditPayment,
+    handleUpdateCreditDueDate,
   } = useAppData(currentUser);
 
   useEffect(() => {
@@ -145,6 +153,12 @@ export default function App() {
       onStockIn: handleStockIn,
       onCreateExpense: handleCreateExpense,
       onSaveSettings: handleSaveSettings,
+      orders,
+      onCreateOrder: handleCreateOrder,
+      onUpdateOrder: handleUpdateOrder,
+      credits,
+      onAddCreditPayment: handleAddCreditPayment,
+      onUpdateCreditDueDate: handleUpdateCreditDueDate,
     };
 
     switch (currentPage) {
@@ -162,6 +176,10 @@ export default function App() {
         return <Users {...props} />;
       case 'settings':
         return <Settings {...props} />;
+      case 'orders':
+        return <Orders {...props} />;
+      case 'credits':
+        return <CreditLedger {...props} />;
       default:
         return <Dashboard {...props} />;
     }
@@ -175,6 +193,8 @@ export default function App() {
     reports: 'reports',
     users: 'users',
     settings: 'settings',
+    orders: 'page',
+    credits: 'page',
   }[currentPage] || 'page';
 
   return (

@@ -9,6 +9,11 @@ export default function Inventory({ products, categories, stockMovements, onStoc
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const [showHarvest, setShowHarvest] = useState(false);
+  const [harvestForm, setHarvestForm] = useState({ productId: '', qty: '', note: 'Harvest' });
+  const [harvestSaving, setHarvestSaving] = useState(false);
+  const [harvestError, setHarvestError] = useState('');
+
   const lowStock = products.filter(p => p.stock <= p.lowStockAlert);
   const outOfStock = products.filter(p => p.stock === 0);
 
@@ -26,10 +31,14 @@ export default function Inventory({ products, categories, stockMovements, onStoc
     setError('');
 
     try {
+      const now = new Date();
       await onStockIn({
         productId: product.id,
+        product: product.name,
         qty: parseInt(stockInForm.qty),
         note: stockInForm.note || 'Manual stock-in',
+        date: now.toISOString().slice(0, 10),
+        time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
       });
       setStockInForm({ productId: '', qty: '', note: '' });
       setShowStockIn(false);
@@ -37,6 +46,33 @@ export default function Inventory({ products, categories, stockMovements, onStoc
       setError(err.message || 'Failed to stock in.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleHarvest = async () => {
+    const product = products.find(p => String(p.id) === String(harvestForm.productId));
+    if (!product || !harvestForm.qty) return;
+
+    setHarvestSaving(true);
+    setHarvestError('');
+
+    try {
+      const now = new Date();
+      await onStockIn({
+        productId: product.id,
+        product: product.name,
+        qty: parseInt(harvestForm.qty),
+        note: harvestForm.note || 'Harvest',
+        type: 'harvest',
+        date: now.toISOString().slice(0, 10),
+        time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
+      });
+      setHarvestForm({ productId: '', qty: '', note: 'Harvest' });
+      setShowHarvest(false);
+    } catch (err) {
+      setHarvestError(err.message || 'Failed to save harvest.');
+    } finally {
+      setHarvestSaving(false);
     }
   };
 
@@ -90,9 +126,14 @@ export default function Inventory({ products, categories, stockMovements, onStoc
             {categories.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
-        <button className="btn btn-dark" onClick={() => setShowStockIn(true)}>
-          <i className="bi bi-plus-circle me-2"></i>Stock In
-        </button>
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-success" onClick={() => setShowHarvest(true)}>
+            <i className="bi bi-basket me-2"></i>Harvest Input
+          </button>
+          <button className="btn btn-dark" onClick={() => setShowStockIn(true)}>
+            <i className="bi bi-plus-circle me-2"></i>Stock In
+          </button>
+        </div>
       </div>
 
       <div className="row g-3">
@@ -116,27 +157,36 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                 </thead>
                 <tbody>
                   {filtered.map(p => {
-                    const status = getStockStatus(p);
-                    const pct = Math.min(100, (p.stock / (p.lowStockAlert * 3)) * 100);
+                    const status   = getStockStatus(p);
+                    const pct      = Math.min(100, (p.stock / Math.max(p.lowStockAlert * 3, 1)) * 100);
+                    const isVar    = p.hasVariants;
+                    const stockUnit = isVar ? (p.baseUnit || 'pc') : p.unit;
                     return (
                       <tr key={p.id}>
                         <td>
                           <span className="fw-semibold">{p.name}</span>
-                          <div className="small text-muted">{p.unit}</div>
+                          {isVar ? (
+                            <div className="small mt-1">
+                              {(p.variants || []).map(v => (
+                                <span key={v.id} className="badge bg-info text-dark me-1 fw-normal" style={{ fontSize: '0.65rem' }}>
+                                  {v.name}/{v.unit}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="small text-muted">{p.unit}</div>
+                          )}
                         </td>
                         <td><span className="badge bg-light text-dark border small">{p.category}</span></td>
                         <td className="text-center">
-                          <div className="fw-bold">{p.stock}</div>
+                          <div className="fw-bold">{p.stock} <span className="text-muted fw-normal" style={{ fontSize: '0.7rem' }}>{stockUnit}</span></div>
                           <div className="progress mt-1" style={{ height: 4, width: 60, margin: 'auto' }}>
-                            <div
-                              className={`progress-bar bg-${status.color}`}
-                              style={{ width: `${pct}%` }}
-                            ></div>
+                            <div className={`progress-bar bg-${status.color}`} style={{ width: `${pct}%` }}></div>
                           </div>
                         </td>
-                        <td className="text-center text-muted small">{p.lowStockAlert}</td>
+                        <td className="text-center text-muted small">{p.lowStockAlert} {stockUnit}</td>
                         <td className="text-center">
-                          <span className={`badge bg-${status.color}${status.color === 'warning' ? ' text-dark' : ''}`}>
+                          <span className={`badge bg-${status.color}${status.color === 'warning' ? ' text-dark' : ''}` }>
                             {status.label}
                           </span>
                         </td>
@@ -191,9 +241,13 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                                     <div className="small fw-semibold text-truncate">{h.product}</div>
                                     <div className="text-muted activity-meta">{h.note || 'Stock movement'} • {h.date} {h.time}</div>
                                   </div>
-                                  <span className={`badge ${h.type === 'stock-in' ? 'bg-success' : h.type === 'sale' ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                                    {h.type === 'stock-in' ? '+' : '-'}{h.qty}
-                                  </span>
+                                  <span className={`badge ${
+                    h.type === 'harvest' ? 'bg-info text-dark' :
+                    h.type === 'stock-in' ? 'bg-success' :
+                    h.type === 'sale' ? 'bg-danger' : 'bg-warning text-dark'
+                  }`}>
+                    {(h.type === 'stock-in' || h.type === 'harvest') ? '+' : '-'}{h.qty}
+                  </span>
                                 </div>
                               </li>
                             ))}
@@ -212,6 +266,88 @@ export default function Inventory({ products, categories, stockMovements, onStoc
           </div>
         </div>
       </div>
+
+      {/* Harvest Input Modal */}
+      {showHarvest && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title"><i className="bi bi-basket me-2 text-success"></i>Harvest Input</h5>
+                <button className="btn-close" onClick={() => setShowHarvest(false)} aria-label="Close"></button>
+              </div>
+              <div className="modal-body">
+                {harvestError && (
+                  <div className="alert alert-danger py-2 small">
+                    <i className="bi bi-exclamation-circle me-1"></i>{harvestError}
+                  </div>
+                )}
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Select Product *</label>
+                  <select className="form-select" value={harvestForm.productId} onChange={e => setHarvestForm({ ...harvestForm, productId: e.target.value })}>
+                    <option value="">-- Choose product --</option>
+                    {products.map(p => {
+                      const unit = p.hasVariants ? (p.baseUnit || 'pc') : p.unit;
+                      return <option key={p.id} value={p.id}>{p.name} (Current: {p.stock} {unit})</option>;
+                    })}
+                  </select>
+                </div>
+                <div className="mb-3">
+                  {(() => {
+                    const selProd = products.find(p => String(p.id) === String(harvestForm.productId));
+                    const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || 'pc');
+                    return (
+                      <>
+                        <label className="form-label fw-semibold">
+                          Quantity Harvested *
+                          {selProd && <span className="text-muted fw-normal ms-1">(in {unit}s)</span>}
+                        </label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={harvestForm.qty}
+                          onChange={e => setHarvestForm({ ...harvestForm, qty: e.target.value })}
+                          placeholder="Enter quantity"
+                          min="1"
+                        />
+                      </>
+                    );
+                  })()}
+                </div>
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Note</label>
+                  <input
+                    className="form-control"
+                    value={harvestForm.note}
+                    onChange={e => setHarvestForm({ ...harvestForm, note: e.target.value })}
+                    placeholder="e.g. Morning harvest, Batch 1..."
+                  />
+                </div>
+                {harvestForm.productId && harvestForm.qty && (
+                  <div className="alert alert-success py-2 small">
+                    <i className="bi bi-basket me-1"></i>
+                    {(() => {
+                      const selProd = products.find(p => String(p.id) === String(harvestForm.productId));
+                      const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || 'unit');
+                      const newQty = (selProd?.stock || 0) + parseInt(harvestForm.qty || 0);
+                      return <>New stock will be: <strong>{newQty} {unit}s</strong></>;
+                    })()}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-outline-secondary" onClick={() => setShowHarvest(false)}>Cancel</button>
+                <button className="btn btn-success" onClick={handleHarvest} disabled={harvestSaving || !harvestForm.productId || !harvestForm.qty}>
+                  {harvestSaving
+                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    : <><i className="bi bi-check2 me-2"></i>Record Harvest</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stock In Modal */}
       {showStockIn && (
@@ -232,14 +368,32 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                   <label className="form-label fw-semibold">Select Product *</label>
                   <select className="form-select" value={stockInForm.productId} onChange={e => setStockInForm({ ...stockInForm, productId: e.target.value })}>
                     <option value="">-- Choose product --</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} (Current: {p.stock} {p.unit})</option>
-                    ))}
+                    {products.map(p => {
+                      const unit = p.hasVariants ? (p.baseUnit || 'pc') : p.unit;
+                      return <option key={p.id} value={p.id}>{p.name} (Current: {p.stock} {unit})</option>;
+                    })}
                   </select>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">Quantity to Add *</label>
-                  <input type="number" className="form-control" value={stockInForm.qty} onChange={e => setStockInForm({ ...stockInForm, qty: e.target.value })} placeholder="Enter quantity" min="1" />
+                  {(() => {
+                    const selProd = products.find(p => String(p.id) === String(stockInForm.productId));
+                    const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || '');
+                    return (
+                      <>
+                        <label className="form-label fw-semibold">
+                          Quantity to Add *
+                          {unit && <span className="text-muted fw-normal ms-1">(in {unit}s)</span>}
+                        </label>
+                        <input type="number" className="form-control" value={stockInForm.qty} onChange={e => setStockInForm({ ...stockInForm, qty: e.target.value })} placeholder="Enter quantity" min="1" />
+                        {selProd?.hasVariants && (
+                          <div className="text-muted small mt-1">
+                            <i className="bi bi-info-circle me-1"></i>
+                            This product has variants. Enter base units ({unit}s) received.
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Note / Source</label>
@@ -249,9 +403,12 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                 {stockInForm.productId && stockInForm.qty && (
                   <div className="alert alert-info py-2 small">
                     <i className="bi bi-info-circle me-1"></i>
-                    New stock will be: <strong>
-                      {(products.find(p => String(p.id) === String(stockInForm.productId))?.stock || 0) + parseInt(stockInForm.qty || 0)}
-                    </strong> units
+                    {(() => {
+                      const selProd = products.find(p => String(p.id) === String(stockInForm.productId));
+                      const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || 'unit');
+                      const newQty = (selProd?.stock || 0) + parseInt(stockInForm.qty || 0);
+                      return <>New stock will be: <strong>{newQty} {unit}s</strong></>;
+                    })()}
                   </div>
                 )}
               </div>

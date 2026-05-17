@@ -71,8 +71,8 @@ export const updateUserStatus = fs.updateUserStatus;
 // ---- transactions ----
 export const fetchTransactions = fs.fetchTransactions;
 export async function createTransaction(payload) {
-  const { updatedProducts, ...transaction } = await fs.createTransaction(payload);
-  return { transaction, updatedProducts };
+  const { updatedProducts, credit, ...transaction } = await fs.createTransaction(payload);
+  return { transaction, updatedProducts, credit: credit || null };
 }
 
 // ---- stock movements ----
@@ -92,6 +92,17 @@ export const createExpense = fs.createExpense;
 
 // ---- audit logs ----
 export const fetchAuditLogs = fs.fetchAuditLogs;
+
+// ---- orders ----
+export const fetchOrders = fs.fetchOrders;
+export const createOrder = fs.createOrder;
+export const updateOrder = fs.updateOrder;
+
+// ---- credits ----
+export const fetchCredits = fs.fetchCredits;
+export const createCredit = fs.createCredit;
+export const addCreditPayment = fs.addCreditPayment;
+export const updateCreditDueDate = fs.updateCreditDueDate;
 
 // ---- password ----
 export const changePassword = (currentPassword, newPassword) => fbChangePassword(currentPassword, newPassword);

@@ -19,7 +19,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
   const topItems = Object.values(salesMap).sort((a, b) => b.amount - a.amount).slice(0, 5);
 
   const cards = [
-    { label: "Today's Sales", value: `₱${todaySales.toLocaleString()}`, icon: 'bi-cash-stack', color: '#198754', bg: '#d1edda' },
+    { label: "Today's Sales", value: `₱${todaySales.toLocaleString()}`, icon: 'bi-cash-stack', color: '#0f766e', bg: '#ccfbf1' },
     { label: 'Transactions Today', value: todayTxns.length, icon: 'bi-receipt', color: '#0d6efd', bg: '#cfe2ff' },
     { label: 'Total Products', value: products.length, icon: 'bi-box-seam', color: '#6610f2', bg: '#e0cffc' },
     { label: 'Low Stock Alerts', value: lowStock.length, icon: 'bi-exclamation-triangle', color: '#dc3545', bg: '#f8d7da' },
@@ -99,7 +99,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
         {/* Right column */}
         <div className="col-lg-5">
           {/* Low Stock Alerts */}
-          <div className=" card-custom mb-3">
+          <div className="card-custom mb-3">
             <div className="card-header-custom text-danger">
               <i className="bi bi-exclamation-triangle-fill me-2"></i>Low Stock Alerts
               <span className="badge bg-danger ms-2">{lowStock.length}</span>

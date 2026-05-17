@@ -20,6 +20,12 @@ import {
   createStockMovement,
   createExpense,
   updateSettings,
+  fetchOrders,
+  createOrder,
+  updateOrder,
+  fetchCredits,
+  addCreditPayment,
+  updateCreditDueDate,
 } from '../utils/api';
 
 const DEFAULT_SETTINGS = {
@@ -42,6 +48,8 @@ export function useAppData(currentUser) {
   const [auditLogs, setAuditLogs] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [orders, setOrders] = useState([]);
+  const [credits, setCredits] = useState([]);
 
   const safeFetch = useCallback(async (fn, fallback) => {
     try {
@@ -65,6 +73,8 @@ export function useAppData(currentUser) {
       isSuper ? safeFetch(fetchUsers, []) : Promise.resolve([]),
       isSuper ? safeFetch(fetchSettings, DEFAULT_SETTINGS) : Promise.resolve(DEFAULT_SETTINGS),
       isSuper ? safeFetch(fetchAuditLogs, []) : Promise.resolve([]),
+      safeFetch(fetchOrders, []),
+      canManage ? safeFetch(fetchCredits, []) : Promise.resolve([]),
     ]);
 
     setProducts(results[0]);
@@ -75,6 +85,8 @@ export function useAppData(currentUser) {
     setUsers(results[5]);
     setSettings(results[6] || DEFAULT_SETTINGS);
     setAuditLogs(results[7]);
+    setOrders(results[8]);
+    setCredits(results[9]);
   }, [safeFetch]);
 
   const resetData = useCallback(() => {
@@ -86,6 +98,8 @@ export function useAppData(currentUser) {
     setAuditLogs([]);
     setExpenses([]);
     setSettings(DEFAULT_SETTINGS);
+    setOrders([]);
+    setCredits([]);
   }, []);
 
   const refreshAuditLogs = useCallback(async () => {
@@ -168,13 +182,17 @@ export function useAppData(currentUser) {
     const res = await createTransaction(payload);
     setTransactions(prev => [...prev, res.transaction]);
     mergeProducts(res.updatedProducts);
+    if (res.credit) {
+      setCredits(prev => [res.credit, ...prev]);
+    }
     await refreshAuditLogs();
     await refreshStockMovements();
     return res.transaction;
   }, [mergeProducts, refreshAuditLogs, refreshStockMovements]);
 
   const handleStockIn = useCallback(async (payload) => {
-    const res = await createStockMovement({ ...payload, type: 'stock-in' });
+    // payload.type overrides the default 'stock-in' (e.g. 'harvest')
+    const res = await createStockMovement({ type: 'stock-in', ...payload });
     setStockMovements(prev => [...prev, res.movement]);
     mergeProducts([res.product]);
     await refreshAuditLogs();
@@ -193,6 +211,30 @@ export function useAppData(currentUser) {
     return updated;
   }, []);
 
+  const handleCreateOrder = useCallback(async (payload) => {
+    const order = await createOrder(payload);
+    setOrders(prev => [order, ...prev]);
+    return order;
+  }, []);
+
+  const handleUpdateOrder = useCallback(async (id, updates) => {
+    const order = await updateOrder(id, updates);
+    setOrders(prev => prev.map(o => o.id === id ? order : o));
+    return order;
+  }, []);
+
+  const handleAddCreditPayment = useCallback(async (id, amount, note) => {
+    const credit = await addCreditPayment(id, amount, note);
+    setCredits(prev => prev.map(c => c.id === id ? credit : c));
+    return credit;
+  }, []);
+
+  const handleUpdateCreditDueDate = useCallback(async (id, dueDate) => {
+    const credit = await updateCreditDueDate(id, dueDate);
+    setCredits(prev => prev.map(c => c.id === id ? credit : c));
+    return credit;
+  }, []);
+
   useEffect(() => {
     if (!currentUser) return undefined;
 
@@ -201,13 +243,15 @@ export function useAppData(currentUser) {
 
     const poll = async () => {
       try {
-        const [nextProducts, nextCategories, nextTransactions, nextMovements, nextExpenses, nextAuditLogs] = await Promise.all([
+        const [nextProducts, nextCategories, nextTransactions, nextMovements, nextExpenses, nextAuditLogs, nextOrders, nextCredits] = await Promise.all([
           fetchProducts(),
           fetchCategories(),
           fetchTransactions(),
           fetchStockMovements(),
           fetchExpenses(),
           currentUser.role === 'superadmin' ? fetchAuditLogs() : Promise.resolve([]),
+          fetchOrders(),
+          fetchCredits(),
         ]);
 
         setProducts(nextProducts);
@@ -216,6 +260,8 @@ export function useAppData(currentUser) {
         setStockMovements(nextMovements);
         setExpenses(nextExpenses);
         if (currentUser.role === 'superadmin') setAuditLogs(nextAuditLogs);
+        setOrders(nextOrders);
+        setCredits(nextCredits);
       } catch {
         // ignore polling errors
       }
@@ -234,6 +280,8 @@ export function useAppData(currentUser) {
     auditLogs,
     expenses,
     settings,
+    orders,
+    credits,
     loadData,
     resetData,
     handleCreateProduct,
@@ -248,5 +296,9 @@ export function useAppData(currentUser) {
     handleStockIn,
     handleCreateExpense,
     handleSaveSettings,
+    handleCreateOrder,
+    handleUpdateOrder,
+    handleAddCreditPayment,
+    handleUpdateCreditDueDate,
   };
 }

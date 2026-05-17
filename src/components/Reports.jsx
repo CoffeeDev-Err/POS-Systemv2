@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { printA4Report } from '../utils/escpos';
 import { toLocalDateString } from '../utils/date';
 import { useReportsData } from '../hooks/useReportsData';
@@ -26,6 +26,14 @@ export default function Reports({ transactions, products, expenses, currentUser,
   const [expenseForm, setExpenseForm] = useState({ date: today, amount: '', category: '', note: '' });
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [expenseError, setExpenseError] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
+
+  const categories = useMemo(
+    () => [...new Set(products.map(p => p.category).filter(Boolean))].sort(),
+    [products]
+  );
+  const handleCategoryChange = (cat) => { setCategoryFilter(cat); setProductFilter(''); };
 
   const canManage = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
 
@@ -42,7 +50,8 @@ export default function Reports({ transactions, products, expenses, currentUser,
     topSellingByAmount,
     topMovingByQty,
     productCostMap,
-  } = useReportsData({ transactions, products, expenses, fromDate, toDate });
+    productCategoryMap,
+  } = useReportsData({ transactions, products, expenses, fromDate, toDate, categoryFilter, productFilter });
 
   const applyPreset = (preset) => {
     const now = new Date();
@@ -54,7 +63,8 @@ export default function Reports({ transactions, products, expenses, currentUser,
       start = toLocalDateString(y);
       end = start;
     } else if (preset === 'week') {
-      const w = new Date(now); w.setDate(w.getDate() - 7);
+      // Last 7 days = inclusive range of 7 calendar days (today + previous 6 days)
+      const w = new Date(now); w.setDate(w.getDate() - 6);
       start = toLocalDateString(w);
     } else if (preset === 'month') {
       const m = new Date(now); m.setDate(1);
@@ -95,9 +105,12 @@ export default function Reports({ transactions, products, expenses, currentUser,
       </tr>
     `).join('');
 
+    const filterLabel = productFilter
+      ? ` | Product: ${products.find(p => p.id === productFilter)?.name || productFilter}`
+      : categoryFilter ? ` | Category: ${categoryFilter}` : '';
     const html = `
       <h1>CARREN'S STORE — Sales Report</h1>
-      <p>Period: <strong>${fromDate}</strong> to <strong>${toDate}</strong> | Generated: ${new Date().toLocaleString()}</p>
+      <p>Period: <strong>${fromDate}</strong> to <strong>${toDate}</strong>${filterLabel} | Generated: ${new Date().toLocaleString()}</p>
       <div style="display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap;">
         <div class="summary-box"><div style="font-size:20pt;font-weight:bold;">${peso(dailySales)}</div><div>Daily Sales</div></div>
         <div class="summary-box"><div style="font-size:20pt;font-weight:bold;">${peso(totals.totalSales)}</div><div>Total Sales</div></div>
@@ -133,6 +146,13 @@ export default function Reports({ transactions, products, expenses, currentUser,
 
     filteredTransactions.forEach(txn => {
       txn.items.forEach(item => {
+        if (categoryFilter || productFilter) {
+          const cat = productCategoryMap.get(item.productId) || '';
+          const matches = productFilter
+            ? (item.productId === productFilter || item.name === productFilter)
+            : cat === categoryFilter;
+          if (!matches) return;
+        }
         const currentCost = productCostMap.get(item.productId);
         const cost = Number.isFinite(currentCost) && currentCost > 0
           ? currentCost
@@ -202,6 +222,12 @@ export default function Reports({ transactions, products, expenses, currentUser,
         onToChange={(value) => { setToDate(value); setRangePreset('custom'); }}
         onPrint={handlePrintReport}
         onExport={handleExportCsv}
+        categories={categories}
+        products={products}
+        categoryFilter={categoryFilter}
+        productFilter={productFilter}
+        onCategoryChange={handleCategoryChange}
+        onProductChange={setProductFilter}
       />
 
       {loading ? (

@@ -8,7 +8,7 @@ export default function ReportsSummaryCards({
   formatCurrency,
 }) {
   const cards = [
-    { label: dayCount > 1 ? 'Daily Sales (Avg)' : 'Daily Sales', value: formatCurrency(dailySales), icon: 'bi-cash-coin', color: '#198754', bg: '#d1edda' },
+    { label: dayCount > 1 ? 'Daily Sales (Avg)' : 'Daily Sales', value: formatCurrency(dailySales), icon: 'bi-cash-coin', color: '#0f766e', bg: '#ccfbf1' },
     { label: 'Total Sales', value: formatCurrency(totals.totalSales), icon: 'bi-cash-stack', color: '#0d6efd', bg: '#cfe2ff' },
     { label: 'Cost of Products Sold', value: formatCurrency(totals.totalCost), icon: 'bi-box', color: '#6c757d', bg: '#e2e3e5' },
     { label: 'Margin', value: formatCurrency(margin), icon: 'bi-graph-up-arrow', color: '#6610f2', bg: '#e0cffc' },

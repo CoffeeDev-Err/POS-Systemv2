@@ -51,13 +51,14 @@
 }
 
 .cat-tab:hover {
-  background: #f2f4f6;
-  color: var(--text-main);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .cat-tab.active {
-  background: #1e2428;
-  border-color: #1e2428;
+  background: var(--accent);
+  border-color: var(--accent);
   color: white;
 }
 
@@ -306,9 +307,9 @@
 }
 
 .qty-btn:hover {
-  background: #1e2428;
+  background: var(--accent);
   color: #fff;
-  border-color: #1e2428;
+  border-color: var(--accent);
 }
 
 .qty-val {
@@ -342,7 +343,7 @@
 }
 
 .btn-process {
-  background: #1e2428;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -351,12 +352,14 @@
   font-size: 0.95rem;
   font-family: 'Nunito', sans-serif;
   transition: all 0.15s;
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.35);
 }
 
 .btn-process:hover:not(:disabled) {
-  background: #2d3539;
+  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
   color: white;
   transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(13, 148, 136, 0.45);
 }
 
 .btn-process:disabled {
@@ -367,8 +370,8 @@
 /* Bluetooth POS Widget */
 .bt-pos-widget {
   padding: 0.65rem 0.75rem;
-  background: linear-gradient(135deg, #1e2428 0%, #2d3539 100%);
-  border-bottom: 1px solid #3a4249;
+  background: linear-gradient(135deg, #0a1f1d 0%, #0f2e2b 100%);
+  border-bottom: 1px solid rgba(13, 148, 136, 0.35);
 }
 
 .bt-pos-title {

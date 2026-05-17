@@ -22,7 +22,7 @@
 }
 
 .receipt-preview .text-success {
-  color: #198754 !important;
+  color: #0f766e !important;
 }
 
 .receipt-preview .text-danger {
@@ -58,7 +58,7 @@ body[data-theme="dark"] .receipt-preview .fw-semibold {
 }
 
 body[data-theme="dark"] .receipt-preview .text-success {
-  color: #198754 !important;
+  color: #0f766e !important;
 }
 
 body[data-theme="dark"] .receipt-preview .text-danger {

@@ -6,9 +6,11 @@ const ROLE_COLORS = { superadmin: '#dc3545', admin: '#fd7e14', cashier: '#198754
 const NAV_ITEMS = [
   { key: 'dashboard', icon: 'bi-speedometer2',  label: 'Dashboard',  roles: ['superadmin', 'admin'] },
   { key: 'pos',       icon: 'bi-cart3',          label: 'POS / Sales', roles: ['superadmin', 'admin', 'cashier'] },
+  { key: 'orders',    icon: 'bi-journal-text',   label: 'Orders',      roles: ['superadmin', 'admin', 'cashier'] },
   { key: 'products',  icon: 'bi-box-seam',        label: 'Products',   roles: ['superadmin', 'admin'] },
   { key: 'inventory', icon: 'bi-clipboard2-data', label: 'Inventory',  roles: ['superadmin', 'admin'] },
   { key: 'reports',   icon: 'bi-bar-chart-line',  label: 'Reports',    roles: ['superadmin', 'admin'] },
+  { key: 'credits',   icon: 'bi-credit-card-2-front', label: 'Credit Ledger', roles: ['superadmin', 'admin'] },
   { key: 'users',     icon: 'bi-people',          label: 'Users',      roles: ['superadmin'] },
   { key: 'settings',  icon: 'bi-gear',            label: 'Settings',   roles: ['superadmin'] },
 ];

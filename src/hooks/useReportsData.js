@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 /**
  * Compute report aggregates for the selected date range.
  */
-export function useReportsData({ transactions, products, expenses, fromDate, toDate }) {
-  const filteredTransactions = useMemo(() => {
+export function useReportsData({ transactions, products, expenses, fromDate, toDate, categoryFilter = '', productFilter = '' }) {
+  const dateFilteredTransactions = useMemo(() => {
     return transactions.filter(t => t.date >= fromDate && t.date <= toDate);
   }, [transactions, fromDate, toDate]);
 
@@ -17,25 +17,59 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
     [products]
   );
 
+  const productCategoryMap = useMemo(
+    () => new Map(products.map(p => [p.id, p.category || ''])),
+    [products]
+  );
+
+  const filteredTransactions = useMemo(() => {
+    if (!categoryFilter && !productFilter) return dateFilteredTransactions;
+    return dateFilteredTransactions.filter(t =>
+      t.items.some(item => {
+        if (productFilter) return item.productId === productFilter || item.name === productFilter;
+        const cat = productCategoryMap.get(item.productId) || '';
+        return cat === categoryFilter;
+      })
+    );
+  }, [dateFilteredTransactions, categoryFilter, productFilter, productCategoryMap]);
+
   const totals = useMemo(() => {
     let totalSales = 0;
     let totalCost = 0;
     let totalItems = 0;
+    const hasFilter = !!(categoryFilter || productFilter);
 
     filteredTransactions.forEach(txn => {
-      totalSales += Number(txn.subtotal || 0);
-      totalItems += txn.items.length;
-      txn.items.forEach(item => {
-        const currentCost = productCostMap.get(item.productId);
-        const unitCost = Number.isFinite(currentCost) && currentCost > 0
-          ? currentCost
-          : Number(item.cost || 0);
-        totalCost += unitCost * Number(item.qty || 0);
-      });
+      if (!hasFilter) {
+        totalSales += Number(txn.subtotal || 0);
+        totalItems += txn.items.length;
+        txn.items.forEach(item => {
+          const currentCost = productCostMap.get(item.productId);
+          const unitCost = Number.isFinite(currentCost) && currentCost > 0
+            ? currentCost
+            : Number(item.cost || 0);
+          totalCost += unitCost * Number(item.qty || 0);
+        });
+      } else {
+        txn.items.forEach(item => {
+          const cat = productCategoryMap.get(item.productId) || '';
+          const matches = productFilter
+            ? (item.productId === productFilter || item.name === productFilter)
+            : cat === categoryFilter;
+          if (!matches) return;
+          totalSales += Number(item.total || 0);
+          totalItems++;
+          const currentCost = productCostMap.get(item.productId);
+          const unitCost = Number.isFinite(currentCost) && currentCost > 0
+            ? currentCost
+            : Number(item.cost || 0);
+          totalCost += unitCost * Number(item.qty || 0);
+        });
+      }
     });
 
     return { totalSales, totalCost, totalItems };
-  }, [filteredTransactions, productCostMap]);
+  }, [filteredTransactions, productCostMap, productCategoryMap, categoryFilter, productFilter]);
 
   const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const margin = totals.totalSales - totals.totalCost;
@@ -56,8 +90,16 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
 
   const topSellingByAmount = useMemo(() => {
     const itemMap = {};
+    const hasFilter = !!(categoryFilter || productFilter);
     filteredTransactions.forEach(t => {
       t.items.forEach(item => {
+        if (hasFilter) {
+          const cat = productCategoryMap.get(item.productId) || '';
+          const matches = productFilter
+            ? (item.productId === productFilter || item.name === productFilter)
+            : cat === categoryFilter;
+          if (!matches) return;
+        }
         const key = item.productId || item.name;
         if (!itemMap[key]) itemMap[key] = { name: item.name, qty: 0, amount: 0 };
         itemMap[key].qty += item.qty;
@@ -65,12 +107,20 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
       });
     });
     return Object.values(itemMap).sort((a, b) => b.amount - a.amount);
-  }, [filteredTransactions]);
+  }, [filteredTransactions, productCategoryMap, categoryFilter, productFilter]);
 
   const topMovingByQty = useMemo(() => {
     const itemMap = {};
+    const hasFilter = !!(categoryFilter || productFilter);
     filteredTransactions.forEach(t => {
       t.items.forEach(item => {
+        if (hasFilter) {
+          const cat = productCategoryMap.get(item.productId) || '';
+          const matches = productFilter
+            ? (item.productId === productFilter || item.name === productFilter)
+            : cat === categoryFilter;
+          if (!matches) return;
+        }
         const key = item.productId || item.name;
         if (!itemMap[key]) itemMap[key] = { name: item.name, qty: 0, amount: 0 };
         itemMap[key].qty += item.qty;
@@ -93,5 +143,6 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
     topSellingByAmount,
     topMovingByQty,
     productCostMap,
+    productCategoryMap,
   };
 }

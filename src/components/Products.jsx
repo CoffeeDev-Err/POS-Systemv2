@@ -7,7 +7,17 @@ import {
   DeleteConfirmModal,
 } from './products/index';
 
-const EMPTY = { name: '', category: '', price: '', cost: '', unit: 'pc', stock: '', lowStockAlert: '' };
+const EMPTY = {
+  name: '', category: '',
+  hasVariants: false,
+  baseUnit: 'pc',
+  // non-variant fields
+  price: '', cost: '', unit: 'pc', conversionRate: 1,
+  priceRetail: '', priceWholesale: '', wholesaleQtyThreshold: '',
+  stock: '', lowStockAlert: '',
+  // variant fields
+  variants: [],
+};
 
 export default function Products({
   products,
@@ -48,11 +58,19 @@ export default function Products({
 
   const openEdit = (p) => {
     setForm({
+      ...EMPTY,
       ...p,
-      price: String(p.price),
-      cost: String(p.cost ?? ''),
-      stock: String(p.stock),
-      lowStockAlert: String(p.lowStockAlert),
+      price:        String(p.price ?? ''),
+      cost:         String(p.cost ?? ''),
+      stock:        String(p.stock ?? ''),
+      lowStockAlert: String(p.lowStockAlert ?? ''),
+      hasVariants:  p.hasVariants || false,
+      baseUnit:     p.baseUnit || p.unit || 'pc',
+      conversionRate: p.conversionRate || 1,
+      variants:     Array.isArray(p.variants) ? p.variants : [],
+      priceRetail:  String(p.priceRetail ?? p.price ?? ''),
+      priceWholesale: String(p.priceWholesale ?? ''),
+      wholesaleQtyThreshold: String(p.wholesaleQtyThreshold ?? ''),
     });
     setEditProduct(p);
     setNewCatMode(false);
@@ -80,18 +98,63 @@ export default function Products({
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.price || !form.cost || !form.stock || !form.category) return;
+    // Validate
+    if (!form.name || !form.category) return;
+    if (form.hasVariants) {
+      if (!form.stock || form.variants.length === 0) return;
+      if (form.variants.some(v => !v.name || !v.price || !v.cost || !v.unit)) return;
+    } else {
+      if (!form.price || !form.cost || !form.stock) return;
+    }
 
     setSaving(true);
     setError('');
 
-    const payload = {
-      ...form,
-      price: parseFloat(form.price),
-      cost: parseFloat(form.cost),
-      stock: parseInt(form.stock),
-      lowStockAlert: parseInt(form.lowStockAlert) || 0,
-    };
+    let payload;
+    if (form.hasVariants) {
+      payload = {
+        name:          form.name,
+        category:      form.category,
+        hasVariants:   true,
+        baseUnit:      form.baseUnit || 'pc',
+        stock:         parseInt(form.stock),
+        lowStockAlert: parseInt(form.lowStockAlert) || 0,
+        // store first variant's price at top level for backward-compat display
+        price:         parseFloat(form.variants[0]?.priceRetail ?? form.variants[0]?.price) || 0,
+        priceRetail:   parseFloat(form.variants[0]?.priceRetail ?? form.variants[0]?.price) || 0,
+        cost:          parseFloat(form.variants[0]?.cost)  || 0,
+        unit:          form.baseUnit || 'pc',
+        conversionRate: 1,
+        variants: form.variants.map(v => ({
+          id:             v.id,
+          name:           v.name,
+          unit:           v.unit,
+          conversionRate: Number(v.conversionRate) || 1,
+          price:          parseFloat(v.priceRetail ?? v.price) || 0,
+          priceRetail:    parseFloat(v.priceRetail ?? v.price) || 0,
+          priceWholesale: v.priceWholesale ? parseFloat(v.priceWholesale) : null,
+          cost:           parseFloat(v.cost),
+          lowStockAlert:  parseInt(v.lowStockAlert) || 0,
+        })),
+      };
+    } else {
+      payload = {
+        name:          form.name,
+        category:      form.category,
+        hasVariants:   false,
+        baseUnit:      form.unit || 'pc',
+        price:         parseFloat(form.priceRetail || form.price) || 0,
+        priceRetail:   parseFloat(form.priceRetail || form.price) || 0,
+        priceWholesale: form.priceWholesale ? parseFloat(form.priceWholesale) : null,
+        wholesaleQtyThreshold: form.wholesaleQtyThreshold ? parseInt(form.wholesaleQtyThreshold) : 0,
+        cost:          parseFloat(form.cost),
+        unit:          form.unit,
+        conversionRate: Number(form.conversionRate) || 1,
+        stock:         parseInt(form.stock),
+        lowStockAlert: parseInt(form.lowStockAlert) || 0,
+        variants:      [],
+      };
+    }
 
     try {
       if (editProduct) {

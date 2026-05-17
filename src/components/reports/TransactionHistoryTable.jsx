@@ -25,7 +25,7 @@ export default function TransactionHistoryTable({
           <tbody>
             {transactions.slice().reverse().map(txn => (
               <tr key={txn.id}>
-                <td><code className="small">{txn.id}</code></td>
+                <td><code className="small">{txn.orNumber || txn.id?.slice(-8)}</code></td>
                 <td>{txn.date} <span className="text-muted">{txn.time}</span></td>
                 <td>{txn.cashierName}</td>
                 <td className="text-center">{txn.items.length}</td>
