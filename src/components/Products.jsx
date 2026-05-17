@@ -102,7 +102,7 @@ export default function Products({
     if (!form.name || !form.category) return;
     if (form.hasVariants) {
       if (!form.stock || form.variants.length === 0) return;
-      if (form.variants.some(v => !v.name || !v.price || !v.cost || !v.unit)) return;
+      if (form.variants.some(v => !v.name || !(v.priceRetail || v.price) || !v.cost || !v.unit)) return;
     } else {
       if (!form.price || !form.cost || !form.stock) return;
     }
