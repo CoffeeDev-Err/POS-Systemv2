@@ -790,7 +790,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
                           <td>
                             <div className="fw-semibold">{item.name}{item.variantName ? ` (${item.variantName})` : ''}</div>
                             <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-                              {item.qty} {item.unit} &times; &#8369;{Number(item.price).toFixed(2)}
+                              {item.qty} {item.variantName ? `(${item.variantName})` : item.unit} &times; &#8369;{Number(item.price).toFixed(2)}
                             </div>
                           </td>
                           <td className="text-end fw-semibold">&#8369;{Number(item.total).toFixed(2)}</td>
