@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../styles/login.css';
 
 export default function Login({ onLogin, loading, error, theme, onToggleTheme }) {
@@ -6,9 +6,23 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef(null);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) { clearInterval(countdownRef.current); setFormError(''); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countdownRef.current);
+  }, [countdown > 0]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (countdown > 0) return;
     setFormError('');
     try {
       await onLogin(username, password);
@@ -17,7 +31,8 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         setFormError('Incorrect username or password. Please try again.');
       } else if (code === 'auth/too-many-requests') {
-        setFormError('Too many failed attempts. Please wait a moment before trying again.');
+        setCountdown(60);
+        setFormError('too-many-requests');
       } else if (code === 'auth/user-disabled') {
         setFormError('This account has been disabled. Contact your administrator.');
       } else if (err.message === 'Invalid username or password.' || err.message === 'This account has been deactivated.') {
@@ -52,10 +67,23 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
         {/* Form */}
         <form onSubmit={handleLogin} autoComplete="off">
           {(formError || error) && (
-            <div className="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
-              <i className="bi bi-exclamation-circle-fill"></i>
-              <small>{formError || error}</small>
-            </div>
+            formError === 'too-many-requests' ? (
+              <div className="alert alert-warning d-flex align-items-start gap-2 py-2" role="alert">
+                <i className="bi bi-clock-history flex-shrink-0 mt-1"></i>
+                <div>
+                  <div className="fw-semibold" style={{ fontSize: '0.85rem' }}>Too many failed attempts.</div>
+                  <div style={{ fontSize: '0.8rem' }}>Please wait <strong>{countdown}s</strong> before trying again.</div>
+                  <div className="mt-1" style={{ height: 4, background: 'rgba(0,0,0,0.1)', borderRadius: 2 }}>
+                    <div style={{ height: '100%', width: `${(countdown / 60) * 100}%`, background: '#f59e0b', borderRadius: 2, transition: 'width 1s linear' }}></div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
+                <i className="bi bi-exclamation-circle-fill"></i>
+                <small>{formError || error}</small>
+              </div>
+            )
           )}
           <div className="mb-3">
             <label className="form-label fw-semibold">Username</label>
@@ -98,10 +126,12 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
               </button>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary w-100 login-btn" disabled={loading}>
+          <button type="submit" className="btn btn-primary w-100 login-btn" disabled={loading || countdown > 0}>
             {loading
               ? <><span className="spinner-border spinner-border-sm me-2"></span>Signing in...</>
-              : <><i className="bi bi-box-arrow-in-right me-2"></i>Sign In</>
+              : countdown > 0
+                ? <><i className="bi bi-clock me-2"></i>Wait {countdown}s</>
+                : <><i className="bi bi-box-arrow-in-right me-2"></i>Sign In</>
             }
           </button>
         </form>

@@ -122,11 +122,36 @@ export default function App() {
   const handleLogout = () => {
     clearAuthToken();
     localStorage.removeItem('pos_user');
+    sessionStorage.removeItem('pos_hidden_at');
     setCurrentUser(null);
     setCurrentPage('dashboard');
     setLoadError('');
     resetData();
   };
+
+  // Auto-logout after 5 minutes of being away (tab hidden / phone locked / switched app)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') {
+        sessionStorage.setItem('pos_hidden_at', String(Date.now()));
+      } else {
+        const hiddenAt = sessionStorage.getItem('pos_hidden_at');
+        if (hiddenAt && Date.now() - Number(hiddenAt) >= SESSION_TIMEOUT_MS) {
+          sessionStorage.removeItem('pos_hidden_at');
+          handleLogout();
+        } else {
+          sessionStorage.removeItem('pos_hidden_at');
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [currentUser]);
 
   if (!currentUser) {
     return <Login onLogin={handleLogin} loading={loading} error={loadError} theme={theme} onToggleTheme={toggleTheme} />;
