@@ -10,7 +10,7 @@ export default function TransactionHistoryTable({
         <i className="bi bi-list-ul me-2"></i>Transaction History
         <span className="ms-2 badge bg-secondary">{transactions.length}</span>
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive table-scroll-panel table-scroll-panel--reports">
         <table className="table table-hover mb-0 align-middle small">
           <thead className="table-light">
             <tr>

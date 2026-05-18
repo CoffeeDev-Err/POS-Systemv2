@@ -615,6 +615,18 @@ margin-top: 0;
   max-height: 60vh;
 }
 
+.table-scroll-panel--page {
+  max-height: 65vh;
+}
+
+.table-scroll-panel--dashboard {
+  max-height: 45vh;
+}
+
+.table-scroll-panel--reports {
+  max-height: 55vh;
+}
+
 .table-scroll-panel .table {
   margin-bottom: 0;
 }

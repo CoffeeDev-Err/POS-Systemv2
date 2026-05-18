@@ -389,7 +389,7 @@ export default function CreditLedger({
             </div>
           ) : (
             <div className="card card-custom">
-              <div className="table-responsive">
+              <div className="table-responsive table-scroll-panel table-scroll-panel--page">
                 <table className="table table-hover mb-0 small">
                   <thead>
                     <tr>

@@ -63,7 +63,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
                   <p className="text-muted mt-2 mb-0">No transactions yet today</p>
                 </div>
               ) : (
-                <div className="table-responsive">
+                <div className="table-responsive table-scroll-panel table-scroll-panel--dashboard">
                   <table className="table table-hover mb-0 small">
                     <thead className="table-light">
                       <tr>

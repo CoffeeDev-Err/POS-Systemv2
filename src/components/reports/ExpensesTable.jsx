@@ -9,7 +9,7 @@ export default function ExpensesTable({ expenses, canManage, onAddExpense, forma
           </button>
         )}
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive table-scroll-panel table-scroll-panel--reports">
         <table className="table table-hover mb-0 align-middle small">
           <thead className="table-light">
             <tr>

@@ -133,7 +133,7 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
 
           <div className="card card-custom">
             <div className="card-header-custom"><i className="bi bi-people me-2"></i>All Users</div>
-            <div className="table-responsive">
+            <div className="table-responsive table-scroll-panel table-scroll-panel--page">
               <table className="table table-hover mb-0 align-middle">
                 <thead className="table-light">
                   <tr>

@@ -236,7 +236,7 @@ export default function Transactions({ transactions, orders, settings, currentUs
               No records found
             </div>
           ) : (
-            <div className="table-responsive">
+            <div className="table-responsive table-scroll-panel table-scroll-panel--page">
               <table className="table table-sm table-hover align-middle">
                 <thead className="table-light">
                   <tr>
