@@ -74,7 +74,7 @@ export function useAppData(currentUser) {
       canManage ? safeFetch(fetchStockMovements, []) : Promise.resolve([]),
       canManage ? safeFetch(fetchExpenses, []) : Promise.resolve([]),
       isSuper ? safeFetch(fetchUsers, []) : Promise.resolve([]),
-      isSuper ? safeFetch(fetchSettings, DEFAULT_SETTINGS) : Promise.resolve(DEFAULT_SETTINGS),
+      safeFetch(fetchSettings, DEFAULT_SETTINGS),
       isSuper ? safeFetch(fetchAuditLogs, []) : Promise.resolve([]),
       safeFetch(fetchOrders, []),
       canManage ? safeFetch(fetchCredits, []) : Promise.resolve([]),
