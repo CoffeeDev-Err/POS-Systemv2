@@ -55,7 +55,7 @@ export const fetchUsers = () => getDocs(col("users")).then(toList);
 export async function createUser(payload) {
   // Derive a synthetic email so Firebase Auth has something to work with.
   // Users only ever log in with their username — the email is internal.
-  const email = `${payload.username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.internal`;
+  const email = `${payload.username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
   await createAuthUser(email, payload.password);
   // Store password in Firestore so admin password resets can update Firebase Auth later.
   const ref = await addDoc(col("users"), { ...payload, email, createdAt: serverTimestamp() });

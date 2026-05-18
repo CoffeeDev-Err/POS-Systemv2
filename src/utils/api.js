@@ -32,7 +32,7 @@ export async function login(username, password) {
   if (userData.active === false) throw new Error("This account has been deactivated.");
 
   // Use stored email, or fall back to the synthetic email format used during account creation
-  const email = userData.email || `${username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.internal`;
+  const email = userData.email || `${username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
   await loginWithEmail(email, password);
   const user = { id: userData.id, ...userData };
   delete user.password;
