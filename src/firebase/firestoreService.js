@@ -57,30 +57,27 @@ export async function createUser(payload) {
   // Users only ever log in with their username — the email is internal.
   const email = `${payload.username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
   await createAuthUser(email, payload.password);
-  // Store password in Firestore so admin password resets can update Firebase Auth later.
-  const ref = await addDoc(col("users"), { ...payload, email, createdAt: serverTimestamp() });
-  const { password: _, ...safe } = payload;
+  // Never store plaintext password in Firestore
+  const { password: _, currentPassword: __, ...safe } = payload;
+  const ref = await addDoc(col("users"), { ...safe, email, createdAt: serverTimestamp() });
   return { id: ref.id, ...safe, email };
 }
 
 export async function updateUser(id, payload) {
   if (payload.password) {
-    // Also update Firebase Auth password via secondary app
+    // Update Firebase Auth password using the current password provided by admin
     const snap = await getDoc(doc(db, "users", id));
     if (snap.exists()) {
       const current = snap.data();
-      // Prefer currentPassword provided by admin (for legacy users without stored password)
-      const authCurrentPassword = payload.currentPassword || current.password;
-      if (current.email && authCurrentPassword) {
-        await updateAuthUserPassword(current.email, authCurrentPassword, payload.password);
+      if (current.email && payload.currentPassword) {
+        await updateAuthUserPassword(current.email, payload.currentPassword, payload.password);
       }
     }
   }
-  // Strip currentPassword — it's not stored in Firestore
-  const { currentPassword: __, ...toStore } = payload;
+  // Never store password or currentPassword in Firestore
+  const { password: _, currentPassword: __, ...toStore } = payload;
   await updateDoc(doc(db, "users", id), toStore);
-  const { password: _, currentPassword: _2, ...safe } = payload;
-  return { id, ...safe };
+  return { id, ...toStore };
 }
 
 export async function updateUserStatus(id, payload) {
