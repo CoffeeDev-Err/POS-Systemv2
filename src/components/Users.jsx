@@ -7,7 +7,7 @@ const ROLE_INFO = {
   cashier:     { label: 'Cashier',     color: 'success', icon: 'bi-cash-coin' },
 };
 
-const EMPTY_USER = { name: '', username: '', password: '', role: 'cashier', active: true };
+const EMPTY_USER = { name: '', username: '', password: '', currentPassword: '', role: 'cashier', active: true };
 
 export default function Users({ users, currentUser, auditLogs, onCreateUser, onUpdateUser, onUpdateUserStatus, onDeleteUser }) {
   const [showModal, setShowModal] = useState(false);
@@ -42,7 +42,10 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
     try {
       if (editUser) {
         const payload = { ...form };
-        if (!payload.password) delete payload.password;
+        if (!payload.password) {
+          delete payload.password;
+          delete payload.currentPassword;
+        }
         await onUpdateUser(editUser.id, payload);
       } else {
         await onCreateUser(form);
@@ -303,6 +306,13 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                       </button>
                     </div>
                   </div>
+                  {editUser && form.password && (
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Current Password <span className="text-muted fw-normal small">(required to apply new password)</span></label>
+                      <input type="password" className="form-control" value={form.currentPassword} onChange={e => setForm({ ...form, currentPassword: e.target.value })} placeholder="Enter current password" />
+                      <div className="text-muted small mt-1"><i className="bi bi-info-circle me-1"></i>Enter the user&apos;s existing password to authorize the change.</div>
+                    </div>
+                  )}
                   <div className="col-12">
                     <div className="form-check form-switch">
                       <input className="form-check-input" type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} id="activeCheck" />

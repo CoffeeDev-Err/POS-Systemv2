@@ -69,14 +69,17 @@ export async function updateUser(id, payload) {
     const snap = await getDoc(doc(db, "users", id));
     if (snap.exists()) {
       const current = snap.data();
-      if (current.email && current.password) {
-        await updateAuthUserPassword(current.email, current.password, payload.password);
+      // Prefer currentPassword provided by admin (for legacy users without stored password)
+      const authCurrentPassword = payload.currentPassword || current.password;
+      if (current.email && authCurrentPassword) {
+        await updateAuthUserPassword(current.email, authCurrentPassword, payload.password);
       }
     }
   }
-  // Persist all fields including new password (used for future resets)
-  await updateDoc(doc(db, "users", id), payload);
-  const { password: _, ...safe } = payload;
+  // Strip currentPassword — it's not stored in Firestore
+  const { currentPassword: __, ...toStore } = payload;
+  await updateDoc(doc(db, "users", id), toStore);
+  const { password: _, currentPassword: _2, ...safe } = payload;
   return { id, ...safe };
 }
 
