@@ -53,3 +53,14 @@ export async function changePassword(currentPassword, newPassword) {
   await reauthenticateWithCredential(user, credential);
   await updatePassword(user, newPassword);
 }
+
+/** Admin: update another user's Firebase Auth password via the secondary app (requires their current password stored in Firestore). */
+export async function updateAuthUserPassword(email, currentPassword, newPassword) {
+  const secondaryAuth = getSecondaryAuth();
+  try {
+    const cred = await signInWithEmailAndPassword(secondaryAuth, email, currentPassword);
+    await updatePassword(cred.user, newPassword);
+  } finally {
+    await signOut(secondaryAuth);
+  }
+}

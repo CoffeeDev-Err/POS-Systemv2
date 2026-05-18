@@ -4,7 +4,7 @@ import {
   query, where, orderBy, serverTimestamp, runTransaction, increment,
 } from "firebase/firestore";
 import { db } from "./config";
-import { createAuthUser } from "./authService";
+import { createAuthUser, updateAuthUserPassword } from "./authService";
 
 // --- helpers ---
 const col = (name) => collection(db, name);
@@ -57,14 +57,26 @@ export async function createUser(payload) {
   // Users only ever log in with their username — the email is internal.
   const email = `${payload.username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.internal`;
   await createAuthUser(email, payload.password);
+  // Store password in Firestore so admin password resets can update Firebase Auth later.
+  const ref = await addDoc(col("users"), { ...payload, email, createdAt: serverTimestamp() });
   const { password: _, ...safe } = payload;
-  const ref = await addDoc(col("users"), { ...safe, email, createdAt: serverTimestamp() });
   return { id: ref.id, ...safe, email };
 }
 
 export async function updateUser(id, payload) {
+  if (payload.password) {
+    // Also update Firebase Auth password via secondary app
+    const snap = await getDoc(doc(db, "users", id));
+    if (snap.exists()) {
+      const current = snap.data();
+      if (current.email && current.password) {
+        await updateAuthUserPassword(current.email, current.password, payload.password);
+      }
+    }
+  }
+  // Persist all fields including new password (used for future resets)
+  await updateDoc(doc(db, "users", id), payload);
   const { password: _, ...safe } = payload;
-  await updateDoc(doc(db, "users", id), safe);
   return { id, ...safe };
 }
 
