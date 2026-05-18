@@ -13,7 +13,18 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
     try {
       await onLogin(username, password);
     } catch (err) {
-      setFormError(err.message || 'Invalid username or password. Please try again.');
+      const code = err.code || '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        setFormError('Incorrect username or password. Please try again.');
+      } else if (code === 'auth/too-many-requests') {
+        setFormError('Too many failed attempts. Please wait a moment before trying again.');
+      } else if (code === 'auth/user-disabled') {
+        setFormError('This account has been disabled. Contact your administrator.');
+      } else if (err.message === 'Invalid username or password.' || err.message === 'This account has been deactivated.') {
+        setFormError(err.message);
+      } else {
+        setFormError('Unable to sign in. Please check your credentials and try again.');
+      }
     }
   };
 
