@@ -120,7 +120,7 @@ export default function Dashboard({ products, transactions, currentUser }) {
                         <div className="text-muted" style={{ fontSize: '0.75rem' }}>{p.category}</div>
                       </div>
                       <span className={`badge ${p.stock === 0 ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                        {p.stock} {p.unit}
+                        {p.stock} {p.hasVariants ? p.baseUnit : p.unit}
                       </span>
                     </li>
                   ))}

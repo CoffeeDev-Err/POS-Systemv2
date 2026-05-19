@@ -66,7 +66,7 @@ export function buildReceiptBytes(data) {
   data.items.forEach(item => {
     const label = item.variantName ? `${item.name} (${item.variantName})` : item.name;
     const name  = label.length > 18 ? label.substring(0, 18) : label;
-    const qty   = item.variantName ? `${item.qty} (${item.variantName})` : `${item.qty}${item.unit ? ' ' + item.unit : ''}`;
+    const qty   = `${item.qty}${item.unit ? ' ' + item.unit : ''}`;  
     const amt   = `P${Number(item.total).toFixed(2)}`;
     t(pad(name, 18) + pad(qty, 6) + pad(amt, 8, true) + '\n');
     t(`  @ P${Number(item.price).toFixed(2)} each\n`);
