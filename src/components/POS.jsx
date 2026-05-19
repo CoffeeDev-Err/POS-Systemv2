@@ -45,6 +45,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
   const [processError, setProcessError] = useState('');
   const [variantPick, setVariantPick]   = useState(null); // { product } or null
   const [priceTier, setPriceTier]       = useState('retail'); // 'retail' | 'wholesale'
+  const [qtyInputs, setQtyInputs]       = useState({}); // { cartKey: displayString }
 
   // Multi-step transaction flow
   const [posStep, setPosStep]           = useState('cart'); // 'cart' | 'review' | 'customer' | 'payment'
@@ -232,6 +233,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
     setPayNowMethod('cash');
     setDueDate('');
     setProcessError('');
+    setQtyInputs({});
   };
 
   const isProcessDisabled = () => {
@@ -540,14 +542,22 @@ export default function POS({ products, currentUser, categories, settings, onCre
                         <i className="bi bi-dash"></i>
                       </button>
                       <input
-                        key={`qty-${idx}-${item.qty}`}
                         type="number"
                         className="qty-val qty-input"
-                        defaultValue={item.qty}
+                        value={qtyInputs[idx] ?? item.qty}
                         min="1"
+                        onChange={e => {
+                          setQtyInputs(prev => ({ ...prev, [idx]: e.target.value }));
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val > 0) setCartQty(idx, val);
+                        }}
                         onFocus={e => e.target.select()}
-                        onBlur={e => setCartQty(idx, e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { setCartQty(idx, e.target.value); e.target.blur(); } }}
+                        onBlur={e => {
+                          setQtyInputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val > 0) setCartQty(idx, val);
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
                         style={{ width: '2.5rem', textAlign: 'center', border: '1.5px solid #dee2e6', borderRadius: 6, background: 'transparent', fontSize: '0.875rem', fontWeight: 800, padding: '1px 2px' }}
                       />
                       <button className="qty-btn" onClick={() => updateCartQty(idx, 1)} aria-label="Increase">
