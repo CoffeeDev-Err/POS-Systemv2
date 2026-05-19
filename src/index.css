@@ -656,7 +656,49 @@ margin-top: 0;
   max-height: 55vh;
 }
 
-/* breakdown-tabs styles removed — using btn btn-sm style instead */
+/* Product breakdown tab buttons */
+.breakdown-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--bs-secondary-color, #6c757d);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Nunito', sans-serif;
+}
+
+.breakdown-tab:hover {
+  border-color: rgba(94, 234, 212, 0.4);
+  color: #5eead4;
+}
+
+.breakdown-tab.active {
+  background: #1a2028;
+  border-color: #0d9488;
+  color: #5eead4;
+}
+
+[data-theme="light"] .breakdown-tab {
+  border-color: #dee2e6;
+  color: #6c757d;
+}
+
+[data-theme="light"] .breakdown-tab:hover {
+  border-color: #0d9488;
+  color: #0d9488;
+}
+
+[data-theme="light"] .breakdown-tab.active {
+  background: #1a2028;
+  border-color: #0d9488;
+  color: #5eead4;
+}
 
 .breakdown-scroll {
   max-height: 55vh;

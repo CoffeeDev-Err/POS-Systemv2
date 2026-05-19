@@ -9,16 +9,16 @@ export default function ProductBreakdownCards({ topSellingByAmount, topMovingByQ
         <div className="card-header-custom">
           <div className="d-flex gap-2">
             <button
-              className={`btn btn-sm ${activeTab === 'sales' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              className={`breakdown-tab ${activeTab === 'sales' ? 'active' : ''}`}
               onClick={() => setActiveTab('sales')}
             >
-              <i className="bi bi-bar-chart me-1"></i>Sales Breakdown
+              <i className="bi bi-bar-chart"></i>Sales Breakdown
             </button>
             <button
-              className={`btn btn-sm ${activeTab === 'moving' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              className={`breakdown-tab ${activeTab === 'moving' ? 'active' : ''}`}
               onClick={() => setActiveTab('moving')}
             >
-              <i className="bi bi-activity me-1"></i>Top Moving
+              <i className="bi bi-activity"></i>Top Moving
             </button>
           </div>
         </div>
