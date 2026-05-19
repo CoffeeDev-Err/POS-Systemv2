@@ -54,12 +54,15 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
         totalSales += Number(txn.subtotal || 0);
         totalItems += txn.items.length;
         txn.items.forEach(item => {
-          const rawCost = item.variantId && variantCostMap.has(item.variantId)
-            ? variantCostMap.get(item.variantId)
-            : productCostMap.get(item.productId);
-          const unitCost = Number.isFinite(rawCost) && rawCost > 0
-            ? rawCost
-            : Number(item.cost || 0);
+          const unitCost = (() => {
+            if (Number(item.cost) > 0) return Number(item.cost);
+            if (item.variantId) {
+              const vc = variantCostMap.get(item.variantId);
+              return (Number.isFinite(vc) && vc > 0) ? vc : 0;
+            }
+            const pc = productCostMap.get(item.productId);
+            return (Number.isFinite(pc) && pc > 0) ? pc : 0;
+          })();
           totalCost += unitCost * Number(item.qty || 0);
         });
       } else {
@@ -71,12 +74,15 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
           if (!matches) return;
           totalSales += Number(item.total || 0);
           totalItems++;
-          const rawCost = item.variantId && variantCostMap.has(item.variantId)
-            ? variantCostMap.get(item.variantId)
-            : productCostMap.get(item.productId);
-          const unitCost = Number.isFinite(rawCost) && rawCost > 0
-            ? rawCost
-            : Number(item.cost || 0);
+          const unitCost = (() => {
+            if (Number(item.cost) > 0) return Number(item.cost);
+            if (item.variantId) {
+              const vc = variantCostMap.get(item.variantId);
+              return (Number.isFinite(vc) && vc > 0) ? vc : 0;
+            }
+            const pc = productCostMap.get(item.productId);
+            return (Number.isFinite(pc) && pc > 0) ? pc : 0;
+          })();
           totalCost += unitCost * Number(item.qty || 0);
         });
       }

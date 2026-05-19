@@ -340,6 +340,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
       }
       const tier = resolveTier(1);
       const resolvedPrice = tier === 'wholesale' ? priceWholesale : priceRetail;
+      const unitCost = Number(src.cost || 0);
       return [...prev, {
         productId: product.id,
         name:      product.name,
@@ -347,6 +348,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
         variantName,
         price:     resolvedPrice,
         priceTier: tier,
+        cost:      unitCost,
         unit,
         conversionRate,
         qty:   1,
