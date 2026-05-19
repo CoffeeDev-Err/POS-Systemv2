@@ -3,13 +3,14 @@ import { toLocalDateString } from '../utils/date';
 
 export default function Dashboard({ products, transactions, currentUser }) {
   const today = toLocalDateString();
-  const todayTxns = transactions.filter(t => t.date === today);
+  const activeTxns = transactions.filter(t => t.status !== 'void');
+  const todayTxns = activeTxns.filter(t => t.date === today);
   const todaySales = todayTxns.reduce((s, t) => s + t.subtotal, 0);
   const lowStock = products.filter(p => p.stock <= p.lowStockAlert);
 
   // Top selling items
   const salesMap = {};
-  transactions.forEach(t => {
+  activeTxns.forEach(t => {
     t.items.forEach(item => {
       if (!salesMap[item.productId]) salesMap[item.productId] = { name: item.name, qty: 0, amount: 0 };
       salesMap[item.productId].qty += item.qty;

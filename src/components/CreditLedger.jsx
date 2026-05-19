@@ -191,7 +191,7 @@ export default function CreditLedger({
   // ── Cash Ledger list ────────────────────────────────────────────────────────
   const cashLedgerRows = useMemo(() => {
     const cashTxns = (transactions || [])
-      .filter(t => ['cash', 'gcash', 'bank'].includes(t.paymentMethod))
+      .filter(t => t.status !== 'void' && ['cash', 'gcash', 'bank'].includes(t.paymentMethod))
       .map(t => ({
         id: t.id,
         date: t.date,

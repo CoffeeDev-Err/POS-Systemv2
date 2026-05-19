@@ -5,7 +5,7 @@ import { useMemo } from 'react';
  */
 export function useReportsData({ transactions, products, expenses, fromDate, toDate, categoryFilter = '', productFilter = '' }) {
   const dateFilteredTransactions = useMemo(() => {
-    return transactions.filter(t => t.date >= fromDate && t.date <= toDate);
+    return transactions.filter(t => t.status !== 'void' && t.date >= fromDate && t.date <= toDate);
   }, [transactions, fromDate, toDate]);
 
   const filteredExpenses = useMemo(() => {
