@@ -7,6 +7,7 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
   const [formError, setFormError] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const throttledRef = useRef(false);
   const countdownRef = useRef(null);
 
   useEffect(() => {
@@ -32,8 +33,14 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         setFormError('Incorrect username or password. Please try again.');
       } else if (code === 'auth/too-many-requests' || msg.includes('too-many-requests')) {
-        setCountdown(60);
-        setFormError('too-many-requests');
+        if (throttledRef.current) {
+          // Already waited once — Firebase is still restricting, don't loop
+          setFormError('still-restricted');
+        } else {
+          throttledRef.current = true;
+          setCountdown(60);
+          setFormError('too-many-requests');
+        }
       } else if (code === 'auth/user-disabled') {
         setFormError('This account has been disabled. Contact your administrator.');
       } else if (msg && !msg.startsWith('Firebase:')) {
@@ -84,6 +91,14 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
               <div className="alert alert-info d-flex align-items-center gap-2 py-2" role="alert">
                 <i className="bi bi-check-circle-fill"></i>
                 <small>You may now try signing in again.</small>
+              </div>
+            ) : formError === 'still-restricted' ? (
+              <div className="alert alert-warning d-flex align-items-start gap-2 py-2" role="alert">
+                <i className="bi bi-shield-exclamation flex-shrink-0 mt-1"></i>
+                <div>
+                  <div className="fw-semibold" style={{ fontSize: '0.85rem' }}>Access is still temporarily restricted.</div>
+                  <div style={{ fontSize: '0.8rem' }}>Too many failed attempts were recorded. Please wait a few minutes and try again.</div>
+                </div>
               </div>
             ) : (
               <div className="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
