@@ -12,8 +12,9 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
     return (expenses || []).filter(e => e.date >= fromDate && e.date <= toDate);
   }, [expenses, fromDate, toDate]);
 
+  // Only used for simple (non-variant) products
   const productCostMap = useMemo(
-    () => new Map(products.map(p => [p.id, Number(p.cost || 0)])),
+    () => new Map(products.filter(p => !p.hasVariants).map(p => [p.id, Number(p.cost || 0)])),
     [products]
   );
 
