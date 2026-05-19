@@ -1,6 +1,6 @@
 export default function ProductBreakdownCards({ topSellingByAmount, topMovingByQty, formatCurrency }) {
   return (
-    <div>
+    <div className="col-lg-4">
       <div className="card-custom mb-3">
         <div className="card-header-custom">
           <i className="bi bi-bar-chart me-2"></i>Product Sales Breakdown
