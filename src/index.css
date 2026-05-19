@@ -283,6 +283,29 @@ code {
   padding: 0 0.5rem;
 }
 
+.nav-group {
+  margin-bottom: 0.25rem;
+}
+
+.nav-group-label {
+  display: block;
+  padding: 0.6rem 0.875rem 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sidebar-text);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
+.nav-sublist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .nav-item {
   display: flex;
   align-items: center;

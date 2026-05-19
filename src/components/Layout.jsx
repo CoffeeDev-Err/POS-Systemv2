@@ -3,23 +3,50 @@ import { useState } from 'react';
 const ROLE_LABELS = { superadmin: 'Super Admin', admin: 'Admin', cashier: 'Cashier' };
 const ROLE_COLORS = { superadmin: '#dc3545', admin: '#fd7e14', cashier: '#198754' };
 
-const NAV_ITEMS = [
-  { key: 'dashboard', icon: 'bi-speedometer2',  label: 'Dashboard',  roles: ['superadmin', 'admin'] },
-  { key: 'pos',       icon: 'bi-cart3',          label: 'POS / Sales', roles: ['superadmin', 'admin', 'cashier'] },
-  { key: 'orders',    icon: 'bi-journal-text',   label: 'Orders',      roles: ['superadmin', 'admin', 'cashier'] },
-  { key: 'products',  icon: 'bi-box-seam',        label: 'Products',   roles: ['superadmin', 'admin'] },
-  { key: 'inventory', icon: 'bi-clipboard2-data', label: 'Inventory',  roles: ['superadmin', 'admin'] },
-  { key: 'reports',   icon: 'bi-bar-chart-line',  label: 'Reports',    roles: ['superadmin', 'admin'] },
-  { key: 'credits',   icon: 'bi-credit-card-2-front', label: 'Credit Ledger', roles: ['superadmin', 'admin'] },
-  { key: 'transactions', icon: 'bi-receipt-cutoff',   label: 'Transactions', roles: ['superadmin', 'admin'] },
-  { key: 'users',     icon: 'bi-people',          label: 'Users',      roles: ['superadmin'] },
-  { key: 'settings',  icon: 'bi-gear',            label: 'Settings',   roles: ['superadmin'] },
+const NAV_GROUPS = [
+  {
+    label: 'Overview',
+    items: [
+      { key: 'dashboard', icon: 'bi-speedometer2', label: 'Dashboard', roles: ['superadmin', 'admin'] },
+    ],
+  },
+  {
+    label: 'Sales',
+    items: [
+      { key: 'pos',          icon: 'bi-cart3',               label: 'POS / Sales',   roles: ['superadmin', 'admin', 'cashier'] },
+      { key: 'orders',       icon: 'bi-journal-text',        label: 'Orders',         roles: ['superadmin', 'admin', 'cashier'] },
+      { key: 'credits',      icon: 'bi-credit-card-2-front', label: 'Credit Ledger', roles: ['superadmin', 'admin'] },
+      { key: 'transactions', icon: 'bi-receipt-cutoff',      label: 'Transactions',  roles: ['superadmin', 'admin'] },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
+      { key: 'products',  icon: 'bi-box-seam',        label: 'Products',  roles: ['superadmin', 'admin'] },
+      { key: 'inventory', icon: 'bi-clipboard2-data', label: 'Inventory', roles: ['superadmin', 'admin'] },
+    ],
+  },
+  {
+    label: 'Analytics',
+    items: [
+      { key: 'reports', icon: 'bi-bar-chart-line', label: 'Reports', roles: ['superadmin', 'admin'] },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { key: 'users',    icon: 'bi-people', label: 'Users',    roles: ['superadmin'] },
+      { key: 'settings', icon: 'bi-gear',   label: 'Settings', roles: ['superadmin'] },
+    ],
+  },
 ];
+
+const NAV_ITEMS_FLAT = NAV_GROUPS.flatMap(g => g.items);
 
 export default function Layout({ children, currentUser, currentPage, setCurrentPage, onLogout, theme, onToggleTheme }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const allowed = NAV_ITEMS.filter(n => n.roles.includes(currentUser.role));
+  const allowed = NAV_ITEMS_FLAT.filter(n => n.roles.includes(currentUser.role));
 
   const navigate = (key) => {
     setCurrentPage(key);
@@ -54,17 +81,28 @@ export default function Layout({ children, currentUser, currentPage, setCurrentP
 
         <nav className="sidebar-nav">
           <ul className="nav-list">
-            {allowed.map(item => (
-              <li key={item.key}>
-                <button
-                  className={`nav-item ${currentPage === item.key ? 'active' : ''}`}
-                  onClick={() => navigate(item.key)}
-                >
-                  <i className={`bi ${item.icon} nav-icon`}></i>
-                  <span>{item.label}</span>
-                </button>
-              </li>
-            ))}
+            {NAV_GROUPS.map(group => {
+              const visibleItems = group.items.filter(n => n.roles.includes(currentUser.role));
+              if (!visibleItems.length) return null;
+              return (
+                <li key={group.label} className="nav-group">
+                  <span className="nav-group-label">{group.label}</span>
+                  <ul className="nav-sublist">
+                    {visibleItems.map(item => (
+                      <li key={item.key}>
+                        <button
+                          className={`nav-item ${currentPage === item.key ? 'active' : ''}`}
+                          onClick={() => navigate(item.key)}
+                        >
+                          <i className={`bi ${item.icon} nav-icon`}></i>
+                          <span>{item.label}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
