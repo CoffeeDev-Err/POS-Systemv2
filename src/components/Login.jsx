@@ -28,15 +28,17 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
       await onLogin(username, password);
     } catch (err) {
       const code = err.code || '';
+      const msg = err.message || '';
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         setFormError('Incorrect username or password. Please try again.');
-      } else if (code === 'auth/too-many-requests') {
+      } else if (code === 'auth/too-many-requests' || msg.includes('too-many-requests')) {
         setCountdown(60);
         setFormError('too-many-requests');
       } else if (code === 'auth/user-disabled') {
         setFormError('This account has been disabled. Contact your administrator.');
-      } else if (err.message) {
-        setFormError(err.message);
+      } else if (msg && !msg.startsWith('Firebase:')) {
+        // Show our own custom error messages (deactivated account, etc.)
+        setFormError(msg);
       } else {
         setFormError('Unable to sign in. Please check your credentials and try again.');
       }
