@@ -212,7 +212,7 @@ code {
   height: 100vh;
   z-index: 1000;
   transition: transform 0.25s ease;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .sidebar-header {
@@ -275,6 +275,12 @@ code {
 .sidebar-nav {
   flex: 1;
   padding: 0.75rem 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-list {
