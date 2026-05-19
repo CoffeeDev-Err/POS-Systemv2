@@ -540,12 +540,14 @@ export default function POS({ products, currentUser, categories, settings, onCre
                         <i className="bi bi-dash"></i>
                       </button>
                       <input
+                        key={`qty-${idx}-${item.qty}`}
                         type="number"
-                        className="qty-val"
-                        value={item.qty}
+                        className="qty-val qty-input"
+                        defaultValue={item.qty}
                         min="1"
-                        onChange={e => setCartQty(idx, e.target.value)}
                         onFocus={e => e.target.select()}
+                        onBlur={e => setCartQty(idx, e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { setCartQty(idx, e.target.value); e.target.blur(); } }}
                         style={{ width: '2.5rem', textAlign: 'center', border: '1.5px solid #dee2e6', borderRadius: 6, background: 'transparent', fontSize: '0.875rem', fontWeight: 800, padding: '1px 2px' }}
                       />
                       <button className="qty-btn" onClick={() => updateCartQty(idx, 1)} aria-label="Increase">

@@ -319,6 +319,11 @@
   text-align: center;
 }
 
+/* Hide number input spinners on qty field */
+input.qty-input::-webkit-outer-spin-button,
+input.qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input.qty-input { -moz-appearance: textfield; }
+
 .cart-payment {
   padding: 1rem;
   border-top: 1px solid var(--border);
