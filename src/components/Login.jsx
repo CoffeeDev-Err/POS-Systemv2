@@ -7,8 +7,14 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
   const [formError, setFormError] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const throttledRef = useRef(false);
   const countdownRef = useRef(null);
+
+  // Restore throttle state if the page was refreshed mid-throttle
+  useEffect(() => {
+    if (sessionStorage.getItem('pos_login_throttled') === 'warned') {
+      setFormError('still-restricted');
+    }
+  }, []);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -27,17 +33,18 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
     setFormError('loading');
     try {
       await onLogin(username, password);
+      sessionStorage.removeItem('pos_login_throttled');
     } catch (err) {
       const code = err.code || '';
       const msg = err.message || '';
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         setFormError('Incorrect username or password. Please try again.');
       } else if (code === 'auth/too-many-requests' || msg.includes('too-many-requests')) {
-        if (throttledRef.current) {
+        if (sessionStorage.getItem('pos_login_throttled') === 'warned') {
           // Already waited once — Firebase is still restricting, don't loop
           setFormError('still-restricted');
         } else {
-          throttledRef.current = true;
+          sessionStorage.setItem('pos_login_throttled', 'warned');
           setCountdown(60);
           setFormError('too-many-requests');
         }
