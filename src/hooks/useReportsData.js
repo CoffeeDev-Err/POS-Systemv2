@@ -17,6 +17,16 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
     [products]
   );
 
+  const variantCostMap = useMemo(() => {
+    const map = new Map();
+    products.forEach(p => {
+      if (p.hasVariants && p.variants) {
+        p.variants.forEach(v => map.set(v.id, Number(v.cost || 0)));
+      }
+    });
+    return map;
+  }, [products]);
+
   const productCategoryMap = useMemo(
     () => new Map(products.map(p => [p.id, p.category || ''])),
     [products]
@@ -44,9 +54,11 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
         totalSales += Number(txn.subtotal || 0);
         totalItems += txn.items.length;
         txn.items.forEach(item => {
-          const currentCost = productCostMap.get(item.productId);
-          const unitCost = Number.isFinite(currentCost) && currentCost > 0
-            ? currentCost
+          const rawCost = item.variantId && variantCostMap.has(item.variantId)
+            ? variantCostMap.get(item.variantId)
+            : productCostMap.get(item.productId);
+          const unitCost = Number.isFinite(rawCost) && rawCost > 0
+            ? rawCost
             : Number(item.cost || 0);
           totalCost += unitCost * Number(item.qty || 0);
         });
@@ -59,9 +71,11 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
           if (!matches) return;
           totalSales += Number(item.total || 0);
           totalItems++;
-          const currentCost = productCostMap.get(item.productId);
-          const unitCost = Number.isFinite(currentCost) && currentCost > 0
-            ? currentCost
+          const rawCost = item.variantId && variantCostMap.has(item.variantId)
+            ? variantCostMap.get(item.variantId)
+            : productCostMap.get(item.productId);
+          const unitCost = Number.isFinite(rawCost) && rawCost > 0
+            ? rawCost
             : Number(item.cost || 0);
           totalCost += unitCost * Number(item.qty || 0);
         });
@@ -69,7 +83,7 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
     });
 
     return { totalSales, totalCost, totalItems };
-  }, [filteredTransactions, productCostMap, productCategoryMap, categoryFilter, productFilter]);
+  }, [filteredTransactions, productCostMap, variantCostMap, productCategoryMap, categoryFilter, productFilter]);
 
   const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const margin = totals.totalSales - totals.totalCost;
@@ -79,8 +93,24 @@ export function useReportsData({ transactions, products, expenses, fromDate, toD
   const dailySales = totals.totalSales / dayCount;
 
   const inventoryInsights = useMemo(() => {
-    const inventoryPrice = products.reduce((sum, p) => sum + Number(p.price || 0) * Number(p.stock || 0), 0);
-    const inventoryCost = products.reduce((sum, p) => sum + Number(p.cost || 0) * Number(p.stock || 0), 0);
+    let inventoryPrice = 0;
+    let inventoryCost = 0;
+    products.forEach(p => {
+      if (p.hasVariants && p.variants?.length > 0) {
+        const valid = p.variants.filter(v => Number(v.conversionRate) > 0);
+        if (valid.length > 0) {
+          const avgPricePerBase = valid.reduce((s, v) =>
+            s + Number(v.priceRetail ?? v.price ?? 0) / Number(v.conversionRate), 0) / valid.length;
+          const avgCostPerBase = valid.reduce((s, v) =>
+            s + Number(v.cost || 0) / Number(v.conversionRate), 0) / valid.length;
+          inventoryPrice += avgPricePerBase * Number(p.stock || 0);
+          inventoryCost += avgCostPerBase * Number(p.stock || 0);
+        }
+      } else {
+        inventoryPrice += Number(p.price ?? p.priceRetail ?? 0) * Number(p.stock || 0);
+        inventoryCost += Number(p.cost || 0) * Number(p.stock || 0);
+      }
+    });
     return {
       inventoryPrice,
       inventoryCost,

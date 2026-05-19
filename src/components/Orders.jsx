@@ -35,7 +35,7 @@ function OrderCard({ order }) {
   );
 }
 
-export default function Orders({ orders, currentUser, settings, onUpdateOrder, onCreateTransaction }) {
+export default function Orders({ orders, products, currentUser, settings, onUpdateOrder, onCreateTransaction }) {
   const [activeTab, setActiveTab]           = useState('pending');
   const [selectedOrder, setSelectedOrder]   = useState(null);
   const [showPayModal, setShowPayModal]     = useState(false);
@@ -112,6 +112,24 @@ export default function Orders({ orders, currentUser, settings, onUpdateOrder, o
     if (!selectedOrder) return;
     setSaving(true);
     setError('');
+
+    // Validate stock availability before processing
+    const stockErrors = [];
+    for (const item of selectedOrder.items || []) {
+      const product = (products || []).find(p => String(p.id) === String(item.productId));
+      if (product) {
+        const requiredBase = Number(item.qty || 0) * (Number(item.conversionRate) || 1);
+        if ((product.stock || 0) < requiredBase) {
+          const label = item.variantName ? `${item.name} (${item.variantName})` : item.name;
+          stockErrors.push(`${label}: need ${requiredBase}, only ${product.stock || 0} ${product.baseUnit || product.unit || 'units'} left`);
+        }
+      }
+    }
+    if (stockErrors.length > 0) {
+      setError('Insufficient stock:\n' + stockErrors.join('\n'));
+      setSaving(false);
+      return;
+    }
     try {
       const now = new Date();
       const completedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
