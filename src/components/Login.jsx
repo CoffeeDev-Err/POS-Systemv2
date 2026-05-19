@@ -35,7 +35,7 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
         setFormError('too-many-requests');
       } else if (code === 'auth/user-disabled') {
         setFormError('This account has been disabled. Contact your administrator.');
-      } else if (err.message === 'Invalid username or password.' || err.message === 'This account has been deactivated.') {
+      } else if (err.message) {
         setFormError(err.message);
       } else {
         setFormError('Unable to sign in. Please check your credentials and try again.');
