@@ -23,6 +23,7 @@ export default function Reports({ transactions, products, expenses, currentUser,
   const [toDate, setToDate] = useState(today);
   const [selectedTxn, setSelectedTxn] = useState(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('transactions');
   const [expenseForm, setExpenseForm] = useState({ date: today, amount: '', category: '', note: '' });
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [expenseError, setExpenseError] = useState('');
@@ -246,20 +247,40 @@ export default function Reports({ transactions, products, expenses, currentUser,
 
           <StockInsightsCards inventoryInsights={inventoryInsights} formatCurrency={peso} />
 
-          <div className="row g-3">
-            <div className="col-lg-8">
+          <div className="reports-tab-section">
+            <ul className="nav nav-tabs reports-tabs">
+              <li className="nav-item">
+                <button
+                  className={`nav-link ${activeTab === 'transactions' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('transactions')}
+                >
+                  <i className="bi bi-list-ul me-1"></i>Transaction History
+                  <span className="ms-2 badge bg-secondary">{filteredTransactions.length}</span>
+                </button>
+              </li>
+              <li className="nav-item">
+                <button
+                  className={`nav-link ${activeTab === 'products' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('products')}
+                >
+                  <i className="bi bi-bar-chart me-1"></i>Product Breakdown
+                </button>
+              </li>
+            </ul>
+            {activeTab === 'transactions' ? (
               <TransactionHistoryTable
                 transactions={filteredTransactions}
                 totalSales={totals.totalSales}
                 onSelectTxn={setSelectedTxn}
                 formatCurrency={peso}
               />
-            </div>
-            <ProductBreakdownCards
-              topSellingByAmount={topSellingByAmount}
-              topMovingByQty={topMovingByQty}
-              formatCurrency={peso}
-            />
+            ) : (
+              <ProductBreakdownCards
+                topSellingByAmount={topSellingByAmount}
+                topMovingByQty={topMovingByQty}
+                formatCurrency={peso}
+              />
+            )}
           </div>
 
           <ExpensesTable

@@ -656,6 +656,41 @@ margin-top: 0;
   max-height: 55vh;
 }
 
+/* Reports tab section */
+.reports-tab-section {
+  margin-bottom: 1rem;
+}
+
+.reports-tabs {
+  border-bottom: none;
+  gap: 2px;
+}
+
+.reports-tabs .nav-link {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--text-muted, #6c757d);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 1rem;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.reports-tabs .nav-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.reports-tabs .nav-link.active {
+  color: #5eead4;
+  background: var(--card-bg, #1e2630);
+  border-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: var(--card-bg, #1e2630);
+}
+
 .table-scroll-panel .table {
   margin-bottom: 0;
 }
