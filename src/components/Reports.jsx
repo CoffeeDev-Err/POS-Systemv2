@@ -247,7 +247,7 @@ export default function Reports({ transactions, products, expenses, currentUser,
           <StockInsightsCards inventoryInsights={inventoryInsights} formatCurrency={peso} />
 
           <div className="row g-3">
-            <div className="col-lg-8">
+            <div className="col-lg-7">
               <TransactionHistoryTable
                 transactions={filteredTransactions}
                 totalSales={totals.totalSales}

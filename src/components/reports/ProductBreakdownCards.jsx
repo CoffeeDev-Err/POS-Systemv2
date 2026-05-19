@@ -4,7 +4,7 @@ export default function ProductBreakdownCards({ topSellingByAmount, topMovingByQ
   const [activeTab, setActiveTab] = useState('sales');
 
   return (
-    <div className="col-lg-4">
+    <div className="col-lg-5">
       <div className="card-custom">
         <div className="card-header-custom p-0">
           <ul className="nav nav-tabs breakdown-tabs">
@@ -27,7 +27,7 @@ export default function ProductBreakdownCards({ topSellingByAmount, topMovingByQ
           </ul>
         </div>
 
-        <div className="card-body p-0 breakdown-scroll">
+        <div key={activeTab} className="card-body p-0 breakdown-scroll">
           {activeTab === 'sales' ? (
             topSellingByAmount.length === 0 ? (
               <div className="empty-state py-4"><i className="bi bi-inbox fs-2 text-muted"></i><p className="text-muted small mt-2">No data</p></div>
