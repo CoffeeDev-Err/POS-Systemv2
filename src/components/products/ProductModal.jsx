@@ -29,7 +29,7 @@ export default function ProductModal({
   const addVariantRow = () => {
     onFormChange({
       ...form,
-      variants: [...variants, { id: genId(), name: '', unit: 'pc', conversionRate: 1, priceRetail: '', priceWholesale: '', cost: '', lowStockAlert: '' }],
+      variants: [...variants, { id: genId(), name: '', unit: 'pc', conversionRate: 1, priceRetail: '', priceWholesale: '', wholesaleQtyThreshold: '', cost: '', lowStockAlert: '' }],
     });
   };
 
@@ -258,6 +258,7 @@ export default function ProductModal({
                               <th title={`How many ${form.baseUnit || 'pc'}s per selling unit`}>{form.baseUnit || 'pc'}s/unit</th>
                               <th>Retail (₱)</th>
                               <th>Wholesale (₱)</th>
+                              <th title="Auto-apply wholesale when qty reaches this">W/S Qty</th>
                               <th>Cost (₱)</th>
                               <th></th>
                             </tr>
@@ -281,6 +282,9 @@ export default function ProductModal({
                                 </td>
                                 <td>
                                   <input type="number" className="form-control form-control-sm" placeholder="same" value={v.priceWholesale ?? ''} onChange={e => updateVariant(idx, 'priceWholesale', e.target.value)} min="0" step="0.01" />
+                                </td>
+                                <td>
+                                  <input type="number" className="form-control form-control-sm" placeholder="—" title="Auto-apply wholesale ≥ this qty" value={v.wholesaleQtyThreshold ?? ''} onChange={e => updateVariant(idx, 'wholesaleQtyThreshold', e.target.value)} min="0" />
                                 </td>
                                 <td>
                                   <input type="number" className="form-control form-control-sm" placeholder="0.00" value={v.cost} onChange={e => updateVariant(idx, 'cost', e.target.value)} min="0" step="0.01" />
