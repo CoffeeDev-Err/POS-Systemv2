@@ -6,25 +6,21 @@ export default function ProductBreakdownCards({ topSellingByAmount, topMovingByQ
   return (
     <div className="col-lg-5">
       <div className="card-custom">
-        <div className="card-header-custom p-0">
-          <ul className="nav nav-tabs breakdown-tabs">
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'sales' ? 'active' : ''}`}
-                onClick={() => setActiveTab('sales')}
-              >
-                <i className="bi bi-bar-chart me-1"></i>Sales Breakdown
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'moving' ? 'active' : ''}`}
-                onClick={() => setActiveTab('moving')}
-              >
-                <i className="bi bi-activity me-1"></i>Top Moving
-              </button>
-            </li>
-          </ul>
+        <div className="card-header-custom">
+          <div className="d-flex gap-2">
+            <button
+              className={`btn btn-sm ${activeTab === 'sales' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setActiveTab('sales')}
+            >
+              <i className="bi bi-bar-chart me-1"></i>Sales Breakdown
+            </button>
+            <button
+              className={`btn btn-sm ${activeTab === 'moving' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setActiveTab('moving')}
+            >
+              <i className="bi bi-activity me-1"></i>Top Moving
+            </button>
+          </div>
         </div>
 
         <div key={activeTab} className="card-body p-0 breakdown-scroll">
