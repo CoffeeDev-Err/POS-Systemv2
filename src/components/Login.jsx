@@ -13,7 +13,7 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
     if (countdown <= 0) return;
     countdownRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) { clearInterval(countdownRef.current); setFormError(''); return 0; }
+        if (prev <= 1) { clearInterval(countdownRef.current); setFormError('retry-now'); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -23,7 +23,7 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
   const handleLogin = async (e) => {
     e.preventDefault();
     if (countdown > 0) return;
-    setFormError('');
+    setFormError('loading');
     try {
       await onLogin(username, password);
     } catch (err) {
@@ -68,7 +68,7 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
 
         {/* Form */}
         <form onSubmit={handleLogin} autoComplete="off">
-          {(formError || error) && (
+          {(formError || error) && formError !== 'loading' && (
             formError === 'too-many-requests' ? (
               <div className="alert alert-warning d-flex align-items-start gap-2 py-2" role="alert">
                 <i className="bi bi-clock-history flex-shrink-0 mt-1"></i>
@@ -79,6 +79,11 @@ export default function Login({ onLogin, loading, error, theme, onToggleTheme })
                     <div style={{ height: '100%', width: `${(countdown / 60) * 100}%`, background: '#f59e0b', borderRadius: 2, transition: 'width 1s linear' }}></div>
                   </div>
                 </div>
+              </div>
+            ) : formError === 'retry-now' ? (
+              <div className="alert alert-info d-flex align-items-center gap-2 py-2" role="alert">
+                <i className="bi bi-check-circle-fill"></i>
+                <small>You may now try signing in again.</small>
               </div>
             ) : (
               <div className="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
