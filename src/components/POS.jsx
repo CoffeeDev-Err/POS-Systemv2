@@ -172,6 +172,46 @@ export default function POS({ products, currentUser, categories, settings, onCre
 
   const removeItem = (idx) => setIncomingCart(prev => prev.filter((_, i) => i !== idx));
 
+  const updateCartQty = (idx, delta) => {
+    setIncomingCart(prev => {
+      const item = prev[idx];
+      const newQty = item.qty + delta;
+      if (newQty <= 0) return prev.filter((_, i) => i !== idx);
+
+      const product = (products || []).find(p => String(p.id) === String(item.productId));
+      if (product) {
+        // Stock check against other cart lines for the same product
+        const otherBaseUnits = prev
+          .filter((_, i) => i !== idx)
+          .filter(i => String(i.productId) === String(item.productId))
+          .reduce((sum, i) => sum + i.qty * (Number(i.conversionRate) || 1), 0);
+        const requiredBase = newQty * (Number(item.conversionRate) || 1);
+        if (otherBaseUnits + requiredBase > (product.stock || 0)) return prev;
+
+        // Re-evaluate wholesale threshold
+        const src = item.variantId
+          ? (product.variants?.find(v => v.id === item.variantId) || product)
+          : product;
+        const priceRetail    = Number(src.priceRetail ?? src.price ?? item.price);
+        const priceWholesale = Number(src.priceWholesale ?? priceRetail);
+        const threshold      = Number(src.wholesaleQtyThreshold ?? product.wholesaleQtyThreshold ?? 0);
+        const tier = priceTier === 'wholesale'
+          ? 'wholesale'
+          : (threshold > 0 && newQty >= threshold ? 'wholesale' : 'retail');
+        const resolvedPrice = tier === 'wholesale' ? priceWholesale : priceRetail;
+
+        const next = [...prev];
+        next[idx] = { ...item, qty: newQty, price: resolvedPrice, priceTier: tier, total: Number((newQty * resolvedPrice).toFixed(2)) };
+        return next;
+      }
+
+      // Fallback: no product found, keep same unit price
+      const next = [...prev];
+      next[idx] = { ...item, qty: newQty, total: Number((newQty * item.price).toFixed(2)) };
+      return next;
+    });
+  };
+
   const resetCart = () => {
     setIncomingCart([]);
     setCashInput('');
@@ -479,12 +519,19 @@ export default function POS({ products, currentUser, categories, settings, onCre
                         )}
                       </div>
                       <div className="cart-item-price text-muted small">
-                        ₱{item.price} × {item.qty} {item.unit && <span>({item.unit})</span>}
+                        ₱{item.price}/{item.unit || 'pc'}
                         {item.priceTier === 'wholesale' && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>W/S</span>}
                       </div>
                     </div>
                     <div className="cart-item-controls">
-                      <span className="cart-item-total">₱{item.total}</span>
+                      <button className="qty-btn" onClick={() => updateCartQty(idx, -1)} aria-label="Decrease">
+                        <i className="bi bi-dash"></i>
+                      </button>
+                      <span className="qty-val">{item.qty}</span>
+                      <button className="qty-btn" onClick={() => updateCartQty(idx, 1)} aria-label="Increase">
+                        <i className="bi bi-plus"></i>
+                      </button>
+                      <span className="cart-item-total ms-1">₱{item.total}</span>
                       <button
                         className="btn btn-link text-danger p-0 ms-1"
                         onClick={() => removeItem(idx)}
