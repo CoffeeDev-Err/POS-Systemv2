@@ -65,7 +65,7 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
-      setError(err.message || 'Failed to save settings.');
+      setError(err.message || 'An error occurred while saving the settings. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -236,12 +236,12 @@ export default function Settings({ settings, onSaveSettings, currentUser }) {
               <p className="text-muted small mb-3">Export your data as a backup file, or restore from a previous backup.</p>
               <div className="d-flex gap-2">
                 <button className="btn btn-outline-dark flex-fill" onClick={() => {
-                  alert('Backup feature: In production, this will export all data as a JSON/Excel file.');
+                  alert('Data export is not yet available. This feature will be supported in a future update.');
                 }}>
                   <i className="bi bi-download me-2"></i>Export Backup
                 </button>
                 <button className="btn btn-outline-secondary flex-fill" onClick={() => {
-                  alert('Restore feature: In production, this will import data from a backup file.');
+                  alert('Data import is not yet available. This feature will be supported in a future update.');
                 }}>
                   <i className="bi bi-upload me-2"></i>Restore
                 </button>

@@ -27,9 +27,9 @@ function waitForCurrentUser() {
 // ---- auth ----
 export async function login(username, password) {
   const snap = await getDocs(query(collection(db, "users"), where("username", "==", username)));
-  if (snap.empty) throw new Error("Invalid username or password.");
+  if (snap.empty) throw new Error("Invalid username or password. Please check your credentials and try again.");
   const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-  if (userData.active === false) throw new Error("This account has been deactivated.");
+  if (userData.active === false) throw new Error("Your account has been deactivated. Please contact your administrator.");
 
   // Use stored email, or fall back to the synthetic email format used during account creation
   const email = userData.email || `${username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;

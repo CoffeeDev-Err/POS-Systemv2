@@ -91,7 +91,7 @@ export default function Products({
       setNewCatMode(false);
       setNewCatInput('');
     } catch (err) {
-      setError(err.message || 'Failed to add category.');
+      setError(err.message || 'An error occurred while adding the category. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -165,7 +165,7 @@ export default function Products({
       }
       setShowModal(false);
     } catch (err) {
-      setError(err.message || 'Failed to save product.');
+      setError(err.message || 'An error occurred while saving the product. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -179,7 +179,7 @@ export default function Products({
       await onDeleteProduct(deleteId, productName);
       setDeleteId(null);
     } catch (err) {
-      setError(err.message || 'Failed to delete product.');
+      setError(err.message || 'An error occurred while deleting the product. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -199,7 +199,7 @@ export default function Products({
       await onDeleteCategory(cat, { deleteProducts: inUse });
       if (catFilter === cat) setCatFilter('All');
     } catch (err) {
-      setError(err.message || 'Failed to delete category.');
+      setError(err.message || 'An error occurred while deleting the category. Please try again.');
     } finally {
       setSaving(false);
     }

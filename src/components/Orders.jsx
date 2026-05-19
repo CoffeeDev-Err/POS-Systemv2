@@ -73,7 +73,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
     try {
       await onUpdateOrder(order.id, { status: 'onprocess' });
     } catch (err) {
-      setError(err.message || 'Failed to accept order.');
+      setError(err.message || 'An error occurred while accepting the order. Please try again.');
     }
   };
 
@@ -93,7 +93,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
       setDeclineOrder(null);
       setDeclineReason('');
     } catch (err) {
-      setError(err.message || 'Failed to decline order.');
+      setError(err.message || 'An error occurred while declining the order. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -126,7 +126,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
       }
     }
     if (stockErrors.length > 0) {
-      setError('Insufficient stock:\n' + stockErrors.join('\n'));
+      setError('The following items have insufficient stock:\n' + stockErrors.join('\n'));
       setSaving(false);
       return;
     }
@@ -164,7 +164,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
       setShowPayModal(false);
       setSelectedOrder(null);
     } catch (err) {
-      setError(err.message || 'Failed to complete payment.');
+      setError(err.message || 'An error occurred while completing the payment. Please try again.');
     } finally {
       setSaving(false);
     }

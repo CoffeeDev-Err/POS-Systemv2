@@ -319,7 +319,7 @@ export async function createCredit(payload) {
 
 export async function addCreditPayment(id, amount, note = '') {
   const credSnap = await getDoc(doc(db, 'credits', id));
-  if (!credSnap.exists()) throw new Error('Credit not found');
+  if (!credSnap.exists()) throw new Error('The specified credit record could not be found.');
   const data = credSnap.data();
   const now = new Date();
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -391,9 +391,9 @@ export async function migrateOrNumbers() {
 export async function voidTransaction(id, voidReason) {
   const txnRef = doc(db, 'transactions', id);
   const txnSnap = await getDoc(txnRef);
-  if (!txnSnap.exists()) throw new Error('Transaction not found');
+  if (!txnSnap.exists()) throw new Error('The specified transaction could not be found.');
   const txnData = txnSnap.data();
-  if (txnData.status === 'void') throw new Error('Transaction is already voided');
+  if (txnData.status === 'void') throw new Error('This transaction has already been voided and cannot be modified.');
 
   const now = new Date();
   const voidedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;

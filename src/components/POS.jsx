@@ -281,7 +281,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
         resetCart();
       }
     } catch (err) {
-      setProcessError(err.message || 'Failed to process.');
+      setProcessError(err.message || 'An error occurred while processing the transaction. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -311,7 +311,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
     const availableBaseUnits = (product.stock || 0) - inCartBaseUnits;
 
     if (availableBaseUnits < conversionRate) {
-      setProcessError('Not enough stock for this item.');
+      setProcessError('Insufficient stock. This item cannot be added to the cart.');
       return;
     }
 
@@ -329,7 +329,7 @@ export default function POS({ products, currentUser, categories, settings, onCre
         const nextQty = prev[idx].qty + 1;
         const otherBaseUnits = inCartBaseUnits - prev[idx].qty * conversionRate;
         if (otherBaseUnits + nextQty * conversionRate > product.stock) {
-          setProcessError('Not enough stock for this item.');
+          setProcessError('Insufficient stock. The requested quantity exceeds available stock.');
           return prev;
         }
         const tier = resolveTier(nextQty);

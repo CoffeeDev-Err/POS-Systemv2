@@ -46,7 +46,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
       setStockInForm({ productId: '', qty: '', note: '' });
       setShowStockIn(false);
     } catch (err) {
-      setError(err.message || 'Failed to stock in.');
+      setError(err.message || 'An error occurred while recording the stock entry. Please try again.');
     } finally {
       setSaving(false);
     }
