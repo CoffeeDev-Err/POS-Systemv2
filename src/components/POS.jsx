@@ -172,10 +172,22 @@ export default function POS({ products, currentUser, categories, settings, onCre
 
   const removeItem = (idx) => setIncomingCart(prev => prev.filter((_, i) => i !== idx));
 
+  const setCartQty = (idx, raw) => {
+    const newQty = parseInt(raw, 10);
+    if (!raw || isNaN(newQty)) return;
+    if (newQty <= 0) { removeItem(idx); return; }
+    updateCartQtyTo(idx, newQty);
+  };
+
   const updateCartQty = (idx, delta) => {
+    const currentQty = incomingCart[idx]?.qty || 0;
+    updateCartQtyTo(idx, currentQty + delta);
+  };
+
+  const updateCartQtyTo = (idx, newQty) => {
     setIncomingCart(prev => {
       const item = prev[idx];
-      const newQty = item.qty + delta;
+      if (!item) return prev;
       if (newQty <= 0) return prev.filter((_, i) => i !== idx);
 
       const product = (products || []).find(p => String(p.id) === String(item.productId));
@@ -527,7 +539,15 @@ export default function POS({ products, currentUser, categories, settings, onCre
                       <button className="qty-btn" onClick={() => updateCartQty(idx, -1)} aria-label="Decrease">
                         <i className="bi bi-dash"></i>
                       </button>
-                      <span className="qty-val">{item.qty}</span>
+                      <input
+                        type="number"
+                        className="qty-val"
+                        value={item.qty}
+                        min="1"
+                        onChange={e => setCartQty(idx, e.target.value)}
+                        onFocus={e => e.target.select()}
+                        style={{ width: '2.5rem', textAlign: 'center', border: '1.5px solid #dee2e6', borderRadius: 6, background: 'transparent', fontSize: '0.875rem', fontWeight: 800, padding: '1px 2px' }}
+                      />
                       <button className="qty-btn" onClick={() => updateCartQty(idx, 1)} aria-label="Increase">
                         <i className="bi bi-plus"></i>
                       </button>
