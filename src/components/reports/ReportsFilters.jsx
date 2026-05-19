@@ -30,7 +30,7 @@ export default function ReportsFilters({
           ].map(({ v, l }) => (
             <button
               key={v}
-              className={`btn btn-sm ${rangePreset === v ? 'btn-dark' : 'btn-outline-secondary'}`}
+              className={`breakdown-tab ${rangePreset === v ? 'active' : ''}`}
               onClick={() => onPresetChange(v)}
             >
               {l}

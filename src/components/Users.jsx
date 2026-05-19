@@ -90,11 +90,11 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
     <div>
       {/* Tabs */}
       <div className="d-flex gap-2 mb-4">
-        <button className={`btn btn-sm ${activeTab === 'users' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setActiveTab('users')}>
-          <i className="bi bi-people me-2"></i>User Management
+        <button className={`breakdown-tab ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+          <i className="bi bi-people"></i>User Management
         </button>
-        <button className={`btn btn-sm ${activeTab === 'logs' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setActiveTab('logs')}>
-          <i className="bi bi-journal-text me-2"></i>Audit Logs
+        <button className={`breakdown-tab ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}>
+          <i className="bi bi-journal-text"></i>Audit Logs
         </button>
       </div>
 

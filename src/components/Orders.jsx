@@ -224,7 +224,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
             {TABS.map(tab => (
               <button
                 key={tab.key}
-                className={`btn btn-sm ${activeTab === tab.key ? 'btn-dark' : 'btn-outline-secondary'}`}
+                className={`breakdown-tab ${activeTab === tab.key ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.key)}
               >
                 <i className={`bi ${tab.icon} me-1`}></i>

@@ -273,27 +273,23 @@ export default function CreditLedger({
       </div>
 
       {/* Tabs */}
-      <ul className="nav nav-tabs mb-4 flex-row flex-nowrap">
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'credit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('credit')}
-          >
-            <i className="bi bi-journal-text me-1" />Credit Ledger
-            {stats.unpaidCount > 0 && (
-              <span className="badge bg-danger ms-2">{stats.unpaidCount}</span>
-            )}
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'cash' ? 'active' : ''}`}
-            onClick={() => setActiveTab('cash')}
-          >
-            <i className="bi bi-cash-stack me-1" />Cash Ledger
-          </button>
-        </li>
-      </ul>
+      <div className="d-flex gap-2 mb-4 flex-wrap">
+        <button
+          className={`breakdown-tab ${activeTab === 'credit' ? 'active' : ''}`}
+          onClick={() => setActiveTab('credit')}
+        >
+          <i className="bi bi-journal-text" />Credit Ledger
+          {stats.unpaidCount > 0 && (
+            <span className="badge bg-danger ms-2">{stats.unpaidCount}</span>
+          )}
+        </button>
+        <button
+          className={`breakdown-tab ${activeTab === 'cash' ? 'active' : ''}`}
+          onClick={() => setActiveTab('cash')}
+        >
+          <i className="bi bi-cash-stack" />Cash Ledger
+        </button>
+      </div>
 
       {/* ── CREDIT LEDGER TAB ── */}
       {activeTab === 'credit' && (
@@ -340,7 +336,7 @@ export default function CreditLedger({
             ].map(f => (
               <button
                 key={f.key}
-                className={`btn btn-sm btn-filter${statusFilter === f.key ? ' btn-filter--active' : ''}`}
+                className={`breakdown-tab ${statusFilter === f.key ? 'active' : ''}`}
                 onClick={() => setStatusFilter(f.key)}
               >
                 {f.label}

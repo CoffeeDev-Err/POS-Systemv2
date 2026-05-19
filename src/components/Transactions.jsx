@@ -219,7 +219,7 @@ export default function Transactions({ transactions, orders, settings, currentUs
             {TABS.map(tab => (
               <button
                 key={tab.key}
-                className={`btn btn-sm ${activeTab === tab.key ? 'btn-dark' : 'btn-outline-secondary'}`}
+                className={`breakdown-tab ${activeTab === tab.key ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.key)}
               >
                 {tab.label}
