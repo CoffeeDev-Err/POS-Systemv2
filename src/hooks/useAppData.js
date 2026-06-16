@@ -215,10 +215,13 @@ export function useAppData(currentUser) {
     if (res.credit) {
       setCredits(prev => [res.credit, ...prev]);
     }
+    const txnRef = res.transaction?.orNumber || res.transaction?.id?.slice(-8) || 'N/A';
+    const amount = Number(res.transaction?.subtotal || 0).toFixed(2);
+    await logAction(`Created transaction OR #${txnRef} (PHP ${amount})`);
     await refreshAuditLogs();
     await refreshStockMovements();
     return res.transaction;
-  }, [mergeProducts, refreshAuditLogs, refreshStockMovements]);
+  }, [logAction, mergeProducts, refreshAuditLogs, refreshStockMovements]);
 
   const handleStockIn = useCallback(async (payload) => {
     // payload.type overrides the default 'stock-in' (e.g. 'harvest')
@@ -233,20 +236,26 @@ export function useAppData(currentUser) {
   const handleCreateExpense = useCallback(async (payload) => {
     const expense = await createExpense(payload);
     setExpenses(prev => [expense, ...prev]);
+    await logAction(`Created expense "${payload?.name || payload?.category || 'N/A'}" (PHP ${Number(payload?.amount || 0).toFixed(2)})`);
+    await refreshAuditLogs();
     return expense;
-  }, []);
+  }, [logAction, refreshAuditLogs]);
 
   const handleSaveSettings = useCallback(async (payload) => {
     const updated = await updateSettings(payload);
     setSettings(updated);
+    await logAction('Updated store settings');
+    await refreshAuditLogs();
     return updated;
-  }, []);
+  }, [logAction, refreshAuditLogs]);
 
   const handleCreateOrder = useCallback(async (payload) => {
     const order = await createOrder(payload);
     setOrders(prev => [order, ...prev]);
+    await logAction(`Created order for "${payload?.customer?.name || 'Walk-in'}" (PHP ${Number(order?.subtotal || 0).toFixed(2)})`);
+    await refreshAuditLogs();
     return order;
-  }, []);
+  }, [logAction, refreshAuditLogs]);
 
   const handleUpdateOrder = useCallback(async (id, updates) => {
     const order = await updateOrder(id, {
@@ -254,8 +263,13 @@ export function useAppData(currentUser) {
       __actor: currentUser ? { id: currentUser.id, name: currentUser.name } : null,
     });
     setOrders(prev => prev.map(o => o.id === id ? order : o));
+    const fields = Object.keys(updates || {}).filter(k => k !== '__actor');
+    const statusText = updates?.status ? ` status=${updates.status}` : '';
+    const ref = String(id || '').slice(-8) || id;
+    await logAction(`Updated order #${ref}${statusText}${fields.length ? ` [${fields.join(', ')}]` : ''}`);
+    await refreshAuditLogs();
     return order;
-  }, [currentUser]);
+  }, [currentUser, logAction, refreshAuditLogs]);
 
   const handleAcquireOrderEditLock = useCallback(async (id) => {
     const order = await acquireOrderEditLock(
@@ -281,14 +295,20 @@ export function useAppData(currentUser) {
   const handleAddCreditPayment = useCallback(async (id, amount, note) => {
     const credit = await addCreditPayment(id, amount, note);
     setCredits(prev => prev.map(c => c.id === id ? credit : c));
+    const ref = String(id || '').slice(-8) || id;
+    await logAction(`Added credit payment to #${ref} (PHP ${Number(amount || 0).toFixed(2)})`);
+    await refreshAuditLogs();
     return credit;
-  }, []);
+  }, [logAction, refreshAuditLogs]);
 
   const handleUpdateCreditDueDate = useCallback(async (id, dueDate) => {
     const credit = await updateCreditDueDate(id, dueDate);
     setCredits(prev => prev.map(c => c.id === id ? credit : c));
+    const ref = String(id || '').slice(-8) || id;
+    await logAction(`Updated credit due date for #${ref} to ${dueDate}`);
+    await refreshAuditLogs();
     return credit;
-  }, []);
+  }, [logAction, refreshAuditLogs]);
 
   const handleVoidTransaction = useCallback(async (id, reason) => {
     const { transaction, updatedProducts } = await voidTransaction(id, reason);
@@ -299,8 +319,11 @@ export function useAppData(currentUser) {
         return updated ? { ...p, stock: updated.stock } : p;
       }));
     }
+    const ref = transaction?.orNumber || String(id || '').slice(-8) || id;
+    await logAction(`Voided transaction OR #${ref}${reason ? ` (Reason: ${reason})` : ''}`);
+    await refreshAuditLogs();
     return transaction;
-  }, []);
+  }, [logAction, refreshAuditLogs]);
 
   useEffect(() => {
     if (!currentUser) return undefined;

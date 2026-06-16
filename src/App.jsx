@@ -19,6 +19,7 @@ import {
   setAuthToken,
   clearAuthToken,
   getAuthToken,
+  addAuditLog,
 } from './utils/api';
 import { useAppData } from './hooks/useAppData';
 
@@ -113,6 +114,11 @@ export default function App() {
       setCurrentUser(user);
       setCurrentPage(user.role === 'cashier' ? 'pos' : 'dashboard');
       await loadData(user.role);
+      try {
+        await addAuditLog(user.name || user.username || 'Unknown', `Logged in (${user.role || 'user'})`);
+      } catch {
+        // Best effort only; login should not fail when audit write fails.
+      }
     } catch (err) {
       setLoadError(err.message || 'Login failed.');
       throw err;
@@ -122,6 +128,9 @@ export default function App() {
   };
 
   const handleLogout = useCallback(() => {
+    if (currentUser?.name) {
+      addAuditLog(currentUser.name, `Logged out (${currentUser.role || 'user'})`).catch(() => {});
+    }
     clearAuthToken();
     localStorage.removeItem('pos_user');
     sessionStorage.removeItem('pos_hidden_at');
@@ -129,7 +138,7 @@ export default function App() {
     setCurrentPage('dashboard');
     setLoadError('');
     resetData();
-  }, [resetData]);
+  }, [currentUser, resetData]);
 
   // Auto-logout after 5 minutes of being away (tab hidden / phone locked / switched app)
   useEffect(() => {
