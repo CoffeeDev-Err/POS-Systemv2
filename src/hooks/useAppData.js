@@ -228,7 +228,8 @@ export function useAppData(currentUser) {
     const res = await createStockMovement({ type: 'stock-in', ...payload });
     setStockMovements(prev => [...prev, res.movement]);
     mergeProducts([res.product]);
-    await logAction(`Stock-in: ${payload.qty} × "${payload.productName || payload.productId}"`);
+    const productLabel = res?.product?.name || payload?.productName || payload?.productId || 'Unknown product';
+    await logAction(`Stock-in: ${payload.qty} × "${productLabel}"`);
     await refreshAuditLogs();
     return res;
   }, [logAction, mergeProducts, refreshAuditLogs]);
