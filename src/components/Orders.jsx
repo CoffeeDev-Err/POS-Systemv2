@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { openCashDrawerViaBluetooth, printViaBluetooth } from '../utils/escpos';
 import '../styles/receipt.css';
 
@@ -53,7 +53,16 @@ function OrderCard({ order }) {
   );
 }
 
-export default function Orders({ orders, products, currentUser, settings, onUpdateOrder, onCreateTransaction }) {
+export default function Orders({
+  orders,
+  products,
+  currentUser,
+  settings,
+  onUpdateOrder,
+  onCreateTransaction,
+  onAcquireOrderEditLock,
+  onReleaseOrderEditLock,
+}) {
   const [activeTab, setActiveTab]           = useState('pending');
   const [selectedOrder, setSelectedOrder]   = useState(null);
   const [showPayModal, setShowPayModal]     = useState(false);
@@ -71,6 +80,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
   const [isPrinting, setIsPrinting]         = useState(false);
   const [showEditModal, setShowEditModal]   = useState(false);
   const [editingOrder, setEditingOrder]     = useState(null);
+  const [lockedOrderId, setLockedOrderId]   = useState(null);
   const [editItems, setEditItems]           = useState([]);
   const [editQtyInputs, setEditQtyInputs]   = useState({});
   const [editError, setEditError]           = useState('');
@@ -169,7 +179,27 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
     openDeclineModal(order);
   };
 
-  const openEditModal = (order) => {
+  const releaseEditLock = useCallback(async (orderId) => {
+    if (!orderId || !onReleaseOrderEditLock) return;
+    try {
+      await onReleaseOrderEditLock(orderId);
+    } catch {
+      // lock release is best-effort
+    }
+  }, [onReleaseOrderEditLock]);
+
+  const openEditModal = async (order) => {
+    setError('');
+    if (onAcquireOrderEditLock) {
+      try {
+        await onAcquireOrderEditLock(order.id);
+        setLockedOrderId(order.id);
+      } catch (err) {
+        setError(err.message || 'This order is currently being edited by another user. Please try again later.');
+        return;
+      }
+    }
+
     const seededItems = (order.items || []).map(item => {
       const qty = Math.max(1, parseInt(item.qty, 10) || 1);
       const price = normalizeMoney(item.price);
@@ -193,12 +223,23 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
 
   const closeEditModal = () => {
     if (editSaving) return;
+    const toRelease = lockedOrderId;
     setShowEditModal(false);
     setEditingOrder(null);
+    setLockedOrderId(null);
     setEditItems([]);
     setEditQtyInputs({});
     setEditError('');
+    releaseEditLock(toRelease);
   };
+
+  useEffect(() => {
+    return () => {
+      if (lockedOrderId) {
+        releaseEditLock(lockedOrderId);
+      }
+    };
+  }, [lockedOrderId, releaseEditLock]);
 
   const updateEditItem = (idx, updates) => {
     setEditItems(prev => prev.map((item, i) => {
@@ -579,6 +620,21 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                     <div className="mt-1 fw-bold fs-5">₱{Number(viewOrder.subtotal || 0).toFixed(2)}</div>
                   </div>
                 </div>
+
+                {(viewOrder.updatedByName || viewOrder.updatedAtText) && (
+                  <div className="small text-muted mb-2">
+                    Last updated:
+                    {viewOrder.updatedByName ? ` ${viewOrder.updatedByName}` : ''}
+                    {viewOrder.updatedAtText ? ` · ${viewOrder.updatedAtText}` : ''}
+                  </div>
+                )}
+
+                {viewOrder.editLock?.byName && Number(viewOrder.editLock?.expiresAtMs || 0) > Date.now() && (
+                  <div className="alert alert-warning py-2 small mb-2">
+                    <i className="bi bi-lock me-1"></i>
+                    Editing lock: currently held by {viewOrder.editLock.byName}.
+                  </div>
+                )}
 
                 <hr className="my-2" />
                 <div className="table-responsive">

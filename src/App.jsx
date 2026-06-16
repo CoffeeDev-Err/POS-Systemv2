@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import LoadingSkeleton from './components/LoadingSkeleton';
@@ -63,6 +63,8 @@ export default function App() {
     orders,
     handleCreateOrder,
     handleUpdateOrder,
+    handleAcquireOrderEditLock,
+    handleReleaseOrderEditLock,
     credits,
     handleAddCreditPayment,
     handleUpdateCreditDueDate,
@@ -119,7 +121,7 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     clearAuthToken();
     localStorage.removeItem('pos_user');
     sessionStorage.removeItem('pos_hidden_at');
@@ -127,7 +129,7 @@ export default function App() {
     setCurrentPage('dashboard');
     setLoadError('');
     resetData();
-  };
+  }, [resetData]);
 
   // Auto-logout after 5 minutes of being away (tab hidden / phone locked / switched app)
   useEffect(() => {
@@ -151,7 +153,7 @@ export default function App() {
 
     document.addEventListener('visibilitychange', onHide);
     return () => document.removeEventListener('visibilitychange', onHide);
-  }, [currentUser]);
+  }, [currentUser, handleLogout]);
 
   if (!currentUser) {
     return <Login onLogin={handleLogin} loading={loading} error={loadError} theme={theme} onToggleTheme={toggleTheme} />;
@@ -185,6 +187,8 @@ export default function App() {
       orders,
       onCreateOrder: handleCreateOrder,
       onUpdateOrder: handleUpdateOrder,
+      onAcquireOrderEditLock: handleAcquireOrderEditLock,
+      onReleaseOrderEditLock: handleReleaseOrderEditLock,
       credits,
       onAddCreditPayment: handleAddCreditPayment,
       onUpdateCreditDueDate: handleUpdateCreditDueDate,

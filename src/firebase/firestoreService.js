@@ -19,6 +19,29 @@ function serialize(data) {
 }
 const toList = (snap) => snap.docs.map(d => ({ id: d.id, ...serialize(d.data()) }));
 
+function toLocalDateTimeString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  const ss = String(date.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+}
+
+function sanitizeOrderItemsForAudit(items = []) {
+  return (items || []).map(item => ({
+    productId: item.productId || '',
+    name: item.name || '',
+    variantId: item.variantId || null,
+    variantName: item.variantName || null,
+    qty: Number(item.qty || 0),
+    unit: item.unit || '',
+    price: Number(item.price || 0),
+    total: Number(item.total || 0),
+  }));
+}
+
 // --- products ---                     
 export const fetchProducts = () => getDocs(col("products")).then(toList);
 
@@ -282,6 +305,10 @@ export async function createOrder(payload) {
     time,
     subtotal,
     cashierName,
+    updatedById: payload.cashierId || '',
+    updatedByName: cashierName,
+    updatedAtText: `${date} ${time}:00`,
+    editLock: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -291,8 +318,103 @@ export async function createOrder(payload) {
 }
 
 export async function updateOrder(id, updates) {
-  await updateDoc(doc(db, 'orders', id), { ...updates, updatedAt: serverTimestamp() });
-  const snap = await getDoc(doc(db, 'orders', id));
+  const orderRef = doc(db, 'orders', id);
+  const beforeSnap = await getDoc(orderRef);
+  if (!beforeSnap.exists()) throw new Error('The specified order could not be found.');
+
+  const before = beforeSnap.data();
+  const actor = updates?.__actor || null;
+  const { __actor, ...safeUpdates } = updates || {};
+  const updatedById = actor?.id || before.updatedById || '';
+  const updatedByName = actor?.name || before.updatedByName || 'System';
+  const updatedAtText = toLocalDateTimeString();
+
+  await updateDoc(orderRef, {
+    ...safeUpdates,
+    updatedById,
+    updatedByName,
+    updatedAtText,
+    updatedAt: serverTimestamp(),
+  });
+
+  const hasItemEdit = Object.prototype.hasOwnProperty.call(safeUpdates, 'items')
+    || Object.prototype.hasOwnProperty.call(safeUpdates, 'subtotal');
+
+  const snap = await getDoc(orderRef);
+  if (hasItemEdit && snap.exists()) {
+    const after = snap.data();
+    await addDoc(col('orderEditLogs'), {
+      orderId: id,
+      editedAtText: updatedAtText,
+      editedById: updatedById,
+      editedByName: updatedByName,
+      changedFields: Object.keys(safeUpdates),
+      before: {
+        status: before.status || '',
+        subtotal: Number(before.subtotal || 0),
+        items: sanitizeOrderItemsForAudit(before.items || []),
+      },
+      after: {
+        status: after.status || '',
+        subtotal: Number(after.subtotal || 0),
+        items: sanitizeOrderItemsForAudit(after.items || []),
+      },
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  return { id, ...serialize(snap.data()) };
+}
+
+export async function acquireOrderEditLock(id, actor, ttlMinutes = 5) {
+  if (!actor?.id) throw new Error('Unable to identify the editor account. Please re-login and try again.');
+  const orderRef = doc(db, 'orders', id);
+
+  await runTransaction(db, async (txn) => {
+    const snap = await txn.get(orderRef);
+    if (!snap.exists()) throw new Error('The specified order could not be found.');
+
+    const data = snap.data() || {};
+    const lock = data.editLock;
+    const now = Date.now();
+    const hasActiveLock = lock && Number(lock.expiresAtMs || 0) > now;
+    const lockedByOther = hasActiveLock && lock.byId && lock.byId !== actor.id;
+
+    if (lockedByOther) {
+      throw new Error(`This order is currently being edited by ${lock.byName || 'another user'}. Please try again shortly.`);
+    }
+
+    txn.update(orderRef, {
+      editLock: {
+        byId: actor.id,
+        byName: actor.name || 'Unknown',
+        acquiredAtMs: now,
+        expiresAtMs: now + Math.max(1, Number(ttlMinutes || 5)) * 60 * 1000,
+      },
+    });
+  });
+
+  const snap = await getDoc(orderRef);
+  return { id, ...serialize(snap.data()) };
+}
+
+export async function releaseOrderEditLock(id, actor = null) {
+  const orderRef = doc(db, 'orders', id);
+
+  await runTransaction(db, async (txn) => {
+    const snap = await txn.get(orderRef);
+    if (!snap.exists()) return;
+
+    const data = snap.data() || {};
+    const lock = data.editLock;
+    if (!lock) return;
+
+    if (actor?.id && lock.byId && lock.byId !== actor.id) return;
+    txn.update(orderRef, { editLock: null });
+  });
+
+  const snap = await getDoc(orderRef);
+  if (!snap.exists()) return null;
   return { id, ...serialize(snap.data()) };
 }
 

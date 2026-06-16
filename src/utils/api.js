@@ -100,6 +100,8 @@ export const addAuditLog = fs.addAuditLog;
 export const fetchOrders = fs.fetchOrders;
 export const createOrder = fs.createOrder;
 export const updateOrder = fs.updateOrder;
+export const acquireOrderEditLock = fs.acquireOrderEditLock;
+export const releaseOrderEditLock = fs.releaseOrderEditLock;
 
 // ---- credits ----
 export const fetchCredits = fs.fetchCredits;

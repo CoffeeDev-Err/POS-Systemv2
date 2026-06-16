@@ -25,6 +25,8 @@ import {
   fetchOrders,
   createOrder,
   updateOrder,
+  acquireOrderEditLock,
+  releaseOrderEditLock,
   fetchCredits,
   addCreditPayment,
   updateCreditDueDate,
@@ -127,7 +129,11 @@ export function useAppData(currentUser) {
 
   const logAction = useCallback(async (action) => {
     if (currentUser?.name) {
-      try { await addAuditLog(currentUser.name, action); } catch (_) {}
+      try {
+        await addAuditLog(currentUser.name, action);
+      } catch {
+        return;
+      }
     }
   }, [currentUser]);
 
@@ -243,10 +249,34 @@ export function useAppData(currentUser) {
   }, []);
 
   const handleUpdateOrder = useCallback(async (id, updates) => {
-    const order = await updateOrder(id, updates);
+    const order = await updateOrder(id, {
+      ...updates,
+      __actor: currentUser ? { id: currentUser.id, name: currentUser.name } : null,
+    });
     setOrders(prev => prev.map(o => o.id === id ? order : o));
     return order;
-  }, []);
+  }, [currentUser]);
+
+  const handleAcquireOrderEditLock = useCallback(async (id) => {
+    const order = await acquireOrderEditLock(
+      id,
+      currentUser ? { id: currentUser.id, name: currentUser.name } : null,
+      5
+    );
+    setOrders(prev => prev.map(o => o.id === id ? order : o));
+    return order;
+  }, [currentUser]);
+
+  const handleReleaseOrderEditLock = useCallback(async (id) => {
+    const order = await releaseOrderEditLock(
+      id,
+      currentUser ? { id: currentUser.id, name: currentUser.name } : null
+    );
+    if (order) {
+      setOrders(prev => prev.map(o => o.id === id ? order : o));
+    }
+    return order;
+  }, [currentUser]);
 
   const handleAddCreditPayment = useCallback(async (id, amount, note) => {
     const credit = await addCreditPayment(id, amount, note);
@@ -336,6 +366,8 @@ export function useAppData(currentUser) {
     handleSaveSettings,
     handleCreateOrder,
     handleUpdateOrder,
+    handleAcquireOrderEditLock,
+    handleReleaseOrderEditLock,
     handleAddCreditPayment,
     handleUpdateCreditDueDate,
     handleVoidTransaction,
