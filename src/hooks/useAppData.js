@@ -264,9 +264,24 @@ export function useAppData(currentUser) {
     });
     setOrders(prev => prev.map(o => o.id === id ? order : o));
     const fields = Object.keys(updates || {}).filter(k => k !== '__actor');
-    const statusText = updates?.status ? ` status=${updates.status}` : '';
+    const hasItemEdit = fields.includes('items') || fields.includes('subtotal');
+    const verb = hasItemEdit ? 'Edited' : 'Updated';
     const ref = String(id || '').slice(-8) || id;
-    await logAction(`Updated order #${ref}${statusText}${fields.length ? ` [${fields.join(', ')}]` : ''}`);
+    const readableFields = fields
+      .map(field => {
+        if (field === 'items') return 'items/qty';
+        if (field === 'subtotal') return 'total amount';
+        if (field === 'status') return updates?.status ? `status: ${updates.status}` : 'status';
+        if (field === 'paymentMethod') return updates?.paymentMethod ? `payment: ${updates.paymentMethod}` : 'payment';
+        if (field === 'dueDate') return updates?.dueDate ? `due date: ${updates.dueDate}` : 'due date';
+        if (field === 'declineReason') return 'decline reason';
+        if (field === 'cash') return 'cash received';
+        if (field === 'change') return 'change';
+        if (field === 'orNumber') return 'OR number';
+        return field;
+      })
+      .filter(Boolean);
+    await logAction(`${verb} order #${ref}${readableFields.length ? ` (${readableFields.join(', ')})` : ''}`);
     await refreshAuditLogs();
     return order;
   }, [currentUser, logAction, refreshAuditLogs]);
