@@ -63,6 +63,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineOrder, setDeclineOrder]     = useState(null);
   const [declineReason, setDeclineReason]   = useState('');
+  const [viewOrder, setViewOrder]           = useState(null);
   const [viewReceiptOrder, setViewReceiptOrder] = useState(null);
   const [saving, setSaving]                 = useState(false);
   const [error, setError]                   = useState('');
@@ -136,6 +137,35 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
     setDueDate('');
     setError('');
     setShowPayModal(true);
+  };
+
+  const openOrderView = (order) => {
+    setViewOrder(order);
+    setError('');
+  };
+
+  const closeOrderView = () => {
+    setViewOrder(null);
+  };
+
+  const openEditFromView = (order) => {
+    closeOrderView();
+    openEditModal(order);
+  };
+
+  const openPayFromView = (order) => {
+    closeOrderView();
+    openPayModal(order);
+  };
+
+  const acceptFromView = async (order) => {
+    await handleAccept(order);
+    closeOrderView();
+  };
+
+  const declineFromView = (order) => {
+    closeOrderView();
+    openDeclineModal(order);
   };
 
   const openEditModal = (order) => {
@@ -444,6 +474,9 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                 <div key={order.id} className="border rounded mb-3">
                   <OrderCard order={order} />
                   <div className="px-3 pb-3 d-flex gap-2">
+                    <button className="btn btn-sm btn-outline-secondary" onClick={() => openOrderView(order)}>
+                      <i className="bi bi-eye me-1"></i>View
+                    </button>
                     <button className="btn btn-sm btn-success flex-fill" onClick={() => handleAccept(order)}>
                       <i className="bi bi-check-circle me-1"></i>Accept
                     </button>
@@ -467,8 +500,8 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                 <div key={order.id} className="border rounded mb-3">
                   <OrderCard order={order} />
                   <div className="px-3 pb-3 d-flex gap-2">
-                    <button className="btn btn-sm btn-outline-secondary" onClick={() => openEditModal(order)}>
-                      <i className="bi bi-pencil-square me-1"></i>Edit
+                    <button className="btn btn-sm btn-outline-secondary" onClick={() => openOrderView(order)}>
+                      <i className="bi bi-eye me-1"></i>View
                     </button>
                     <button className="btn btn-sm btn-process flex-fill" onClick={() => openPayModal(order)}>
                       <i className="bi bi-check-circle me-1"></i>Ready — Pay
@@ -512,6 +545,94 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
           )}
         </div>
       </div>
+
+      {/* ── View Order Modal ── */}
+      {viewOrder && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="bi bi-eye me-2"></i>View Order
+                </h5>
+                <button className="btn-close" onClick={closeOrderView} />
+              </div>
+              <div className="modal-body">
+                <div className="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <div className="fw-semibold fs-6">{viewOrder.customer?.name || 'Walk-in'}</div>
+                    <div className="small text-muted">{viewOrder.customer?.contact}{viewOrder.customer?.address ? ` · ${viewOrder.customer.address}` : ''}</div>
+                    {viewOrder.notes && <div className="small fst-italic text-muted mt-1">"{viewOrder.notes}"</div>}
+                    {viewOrder.dueDate && (
+                      <div className="small text-warning mt-1">
+                        <i className="bi bi-calendar-event me-1"></i>Due: {viewOrder.dueDate}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-end">
+                    <div className="small text-muted text-uppercase">Status</div>
+                    <div className="fw-semibold text-capitalize">{viewOrder.status}</div>
+                    <div className="mt-1 fw-bold fs-5">₱{Number(viewOrder.subtotal || 0).toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <hr className="my-2" />
+                <div className="table-responsive">
+                  <table className="table table-sm align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Item</th>
+                        <th className="text-end">Qty</th>
+                        <th className="text-end">Unit Price</th>
+                        <th className="text-end">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(viewOrder.items || []).map((item, idx) => (
+                        <tr key={`${item.productId || item.name}-${item.variantId || 'base'}-${idx}`}>
+                          <td>
+                            <div className="fw-semibold">{item.name}{item.variantName ? ` (${item.variantName})` : ''}</div>
+                            <div className="small text-muted">{item.unit || 'pc'}</div>
+                          </td>
+                          <td className="text-end">{item.qty}</td>
+                          <td className="text-end">
+                            ₱{Number(item.price || 0).toFixed(2)}
+                            {item.priceTier === 'wholesale' && <span className="badge bg-warning text-dark ms-1">W/S</span>}
+                          </td>
+                          <td className="text-end fw-semibold">₱{Number(item.total || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer d-flex gap-2">
+                {(viewOrder.status === 'pending' || viewOrder.status === 'onprocess') && (
+                  <button className="btn btn-outline-secondary" onClick={() => openEditFromView(viewOrder)}>
+                    <i className="bi bi-pencil-square me-1"></i>Edit
+                  </button>
+                )}
+                {viewOrder.status === 'pending' && (
+                  <button className="btn btn-success" onClick={() => acceptFromView(viewOrder)}>
+                    <i className="bi bi-check-circle me-1"></i>Accept
+                  </button>
+                )}
+                {viewOrder.status === 'onprocess' && (
+                  <button className="btn btn-process" onClick={() => openPayFromView(viewOrder)}>
+                    <i className="bi bi-check-circle me-1"></i>Ready — Pay
+                  </button>
+                )}
+                {(viewOrder.status === 'pending' || viewOrder.status === 'onprocess') && (
+                  <button className="btn btn-outline-danger" onClick={() => declineFromView(viewOrder)}>
+                    <i className="bi bi-x-circle me-1"></i>Decline
+                  </button>
+                )}
+                <button className="btn btn-outline-secondary ms-auto" onClick={closeOrderView}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit Order Modal ── */}
       {showEditModal && editingOrder && (
@@ -582,7 +703,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                   </div>
                 )}
 
-                <div className="border rounded p-3 bg-light-subtle">
+                <div className="border rounded p-3 order-edit-add-box">
                   <div className="fw-semibold mb-2">Add Product</div>
                   <div className="row g-2">
                     <div className="col-md-4">

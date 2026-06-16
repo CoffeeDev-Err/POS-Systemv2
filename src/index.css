@@ -797,6 +797,15 @@ margin-top: 0;
   text-align: center;
 }
 
+.order-edit-add-box {
+  background: #f5f7fa;
+  border-color: var(--border) !important;
+}
+
+.order-edit-add-box .form-label {
+  color: #6b7785;
+}
+
 /* Page header */
 .page-header {
   display: flex;
@@ -1247,4 +1256,13 @@ body[data-theme="dark"] .dropdown-item:focus {
 
 body[data-theme="dark"] .dropdown-divider {
   border-color: var(--border);
+}
+
+body[data-theme="dark"] .order-edit-add-box {
+  background: #11171c;
+  border-color: var(--border) !important;
+}
+
+body[data-theme="dark"] .order-edit-add-box .form-label {
+  color: #b2bcc7;
 }
