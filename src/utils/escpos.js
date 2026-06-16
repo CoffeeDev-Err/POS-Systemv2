@@ -55,6 +55,10 @@ export function buildReceiptBytes(data) {
   const p = (arr) => parts.push(new Uint8Array(arr));
   const t = (str) => parts.push(enc.encode(str));
 
+  const RECEIPT_COLS = 32;
+  // Some 58mm printers effectively allow ~14 chars at double width.
+  const DOUBLE_HEADER_SAFE_COLS = 14;
+
   const divider  = '================================\n';
   const divider2 = '--------------------------------\n';
 
@@ -64,13 +68,13 @@ export function buildReceiptBytes(data) {
   p(CMD.alignCenter);
   p(CMD.boldOn);
   const storeName = String(data.storeName || '').trim() || 'STORE';
-  const useDoubleHeader = storeName.length <= 16;
+  const useDoubleHeader = storeName.length <= DOUBLE_HEADER_SAFE_COLS;
   if (useDoubleHeader) {
     p(CMD.sizeDouble);
     t(storeName + '\n');
   } else {
     p(CMD.sizeNormal);
-    wrapText(storeName, 32).forEach(line => t(line + '\n'));
+    wrapText(storeName, RECEIPT_COLS).forEach(line => t(line + '\n'));
   }
   p(CMD.sizeNormal);
   p(CMD.boldOff);
