@@ -28,6 +28,27 @@ function twoCol(left, right, width = 32) {
   return l + ' '.repeat(spaces) + r + '\n';
 }
 
+function wrapText(text, width = 32) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [''];
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    if (!current) {
+      current = word;
+      continue;
+    }
+    if ((current + ' ' + word).length <= width) {
+      current += ' ' + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 export function buildReceiptBytes(data) {
   const enc = new TextEncoder();
   const parts = [];
@@ -42,8 +63,15 @@ export function buildReceiptBytes(data) {
   // Store header
   p(CMD.alignCenter);
   p(CMD.boldOn);
-  p(CMD.sizeDouble);
-  t(data.storeName + '\n');
+  const storeName = String(data.storeName || '').trim() || 'STORE';
+  const useDoubleHeader = storeName.length <= 16;
+  if (useDoubleHeader) {
+    p(CMD.sizeDouble);
+    t(storeName + '\n');
+  } else {
+    p(CMD.sizeNormal);
+    wrapText(storeName, 32).forEach(line => t(line + '\n'));
+  }
   p(CMD.sizeNormal);
   p(CMD.boldOff);
   if (data.address) t(data.address + '\n');

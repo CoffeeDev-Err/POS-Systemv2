@@ -2,6 +2,24 @@ import { useState } from 'react';
 import { openCashDrawerViaBluetooth, printViaBluetooth } from '../utils/escpos';
 import '../styles/receipt.css';
 
+function normalizeMoney(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
+}
+
+function resolveAutoPricing(product, item = null, qty = 1) {
+  if (!product) return null;
+  const src = item?.variantId
+    ? (product.variants || []).find(v => String(v.id) === String(item.variantId)) || product
+    : product;
+  const priceRetail = normalizeMoney(src.priceRetail ?? src.price ?? item?.price ?? 0);
+  const priceWholesale = normalizeMoney(src.priceWholesale ?? priceRetail);
+  const threshold = Number(src.wholesaleQtyThreshold ?? product.wholesaleQtyThreshold ?? 0);
+  const tier = (threshold > 0 && Number(qty) >= threshold) ? 'wholesale' : 'retail';
+  const price = tier === 'wholesale' ? priceWholesale : priceRetail;
+  return { price, tier };
+}
+
 function OrderCard({ order }) {
   return (
     <div className="p-3">
@@ -50,6 +68,14 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
   const [error, setError]                   = useState('');
   const [printStatus, setPrintStatus]       = useState('');
   const [isPrinting, setIsPrinting]         = useState(false);
+  const [showEditModal, setShowEditModal]   = useState(false);
+  const [editingOrder, setEditingOrder]     = useState(null);
+  const [editItems, setEditItems]           = useState([]);
+  const [editError, setEditError]           = useState('');
+  const [editSaving, setEditSaving]         = useState(false);
+  const [addProductId, setAddProductId]     = useState('');
+  const [addVariantId, setAddVariantId]     = useState('');
+  const [addQty, setAddQty]                 = useState('1');
 
   const pendingOrders   = (orders || []).filter(o => o.status === 'pending');
   const onProcessOrders = (orders || []).filter(o => o.status === 'onprocess');
@@ -58,6 +84,10 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
   const subtotal  = selectedOrder?.subtotal || 0;
   const cashPaid  = payMethod === 'cash' ? (parseFloat(cashInput) || 0) : subtotal;
   const changeDue = payMethod === 'cash' ? cashPaid - subtotal : 0;
+
+  const editedSubtotal = normalizeMoney(
+    editItems.reduce((sum, item) => sum + normalizeMoney(item.total), 0)
+  );
 
   const isPayDisabled = () => {
     if (saving) return true;
@@ -106,6 +136,170 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
     setDueDate('');
     setError('');
     setShowPayModal(true);
+  };
+
+  const openEditModal = (order) => {
+    const seededItems = (order.items || []).map(item => {
+      const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+      const price = normalizeMoney(item.price);
+      return {
+        ...item,
+        qty,
+        price,
+        priceTier: item.priceTier || 'retail',
+        total: normalizeMoney(item.total || qty * price),
+      };
+    });
+    setEditingOrder(order);
+    setEditItems(seededItems);
+    setEditError('');
+    setAddProductId('');
+    setAddVariantId('');
+    setAddQty('1');
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    if (editSaving) return;
+    setShowEditModal(false);
+    setEditingOrder(null);
+    setEditItems([]);
+    setEditError('');
+  };
+
+  const updateEditItem = (idx, updates) => {
+    setEditItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const next = { ...item, ...updates };
+      const qty = Math.max(1, parseInt(next.qty, 10) || 1);
+      const product = (products || []).find(p => String(p.id) === String(next.productId));
+      const auto = resolveAutoPricing(product, next, qty);
+      const price = normalizeMoney(auto?.price ?? next.price);
+      const priceTier = auto?.tier || next.priceTier || 'retail';
+      return { ...next, qty, priceTier, price, total: normalizeMoney(qty * price) };
+    }));
+  };
+
+  const removeEditItem = (idx) => {
+    setEditItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddItemToEdit = () => {
+    setEditError('');
+    const product = (products || []).find(p => String(p.id) === String(addProductId));
+    if (!product) {
+      setEditError('Select a product first.');
+      return;
+    }
+
+    const isVariant = !!product.hasVariants;
+    const variant = isVariant
+      ? (product.variants || []).find(v => String(v.id) === String(addVariantId))
+      : null;
+
+    if (isVariant && !variant) {
+      setEditError('Select a variant for this product.');
+      return;
+    }
+
+    const qtyToAdd = Math.max(1, parseInt(addQty, 10) || 1);
+    const key = `${product.id}:${variant?.id || 'base'}`;
+
+    setEditItems(prev => {
+      const idx = prev.findIndex(i => `${i.productId}:${i.variantId || 'base'}` === key);
+      if (idx >= 0) {
+        return prev.map((i, row) => {
+          if (row !== idx) return i;
+          const qty = (parseInt(i.qty, 10) || 0) + qtyToAdd;
+          const auto = resolveAutoPricing(product, i, qty);
+          const price = normalizeMoney(auto?.price ?? i.price);
+          return { ...i, qty, priceTier: auto?.tier || i.priceTier || 'retail', price, total: normalizeMoney(qty * price) };
+        });
+      }
+
+      const seeded = {
+        productId: product.id,
+        variantId: variant?.id || null,
+        price: 0,
+      };
+      const auto = resolveAutoPricing(product, seeded, qtyToAdd);
+      const resolvedPrice = normalizeMoney(auto?.price ?? 0);
+
+      return [...prev, {
+        productId: product.id,
+        name: product.name,
+        variantId: variant?.id || null,
+        variantName: variant?.name || null,
+        unit: variant?.unit || product.unit || product.baseUnit || 'pc',
+        conversionRate: Number(variant?.conversionRate ?? product.conversionRate ?? 1) || 1,
+        qty: qtyToAdd,
+        priceTier: auto?.tier || 'retail',
+        price: resolvedPrice,
+        cost: normalizeMoney((variant || product).cost || 0),
+        total: normalizeMoney(qtyToAdd * resolvedPrice),
+      }];
+    });
+  };
+
+  const handleSaveEditedOrder = async () => {
+    if (!editingOrder) return;
+    if (editItems.length === 0) {
+      setEditError('Order must have at least one item.');
+      return;
+    }
+
+    setEditSaving(true);
+    setEditError('');
+
+    try {
+      const requiredByProduct = new Map();
+      for (const item of editItems) {
+        const baseNeed = (Number(item.qty) || 0) * (Number(item.conversionRate) || 1);
+        const key = String(item.productId);
+        requiredByProduct.set(key, (requiredByProduct.get(key) || 0) + baseNeed);
+      }
+
+      const stockErrors = [];
+      requiredByProduct.forEach((required, productId) => {
+        const product = (products || []).find(p => String(p.id) === productId);
+        if (!product) return;
+        const available = Number(product.stock || 0);
+        if (required > available) {
+          stockErrors.push(`${product.name}: need ${required}, only ${available} ${product.baseUnit || product.unit || 'units'} left`);
+        }
+      });
+
+      if (stockErrors.length > 0) {
+        setEditError('Insufficient stock for edited order:\n' + stockErrors.join('\n'));
+        setEditSaving(false);
+        return;
+      }
+
+      const normalizedItems = editItems.map(item => {
+        const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+        const product = (products || []).find(p => String(p.id) === String(item.productId));
+        const auto = resolveAutoPricing(product, item, qty);
+        const price = normalizeMoney(auto?.price ?? item.price);
+        return { ...item, qty, priceTier: auto?.tier || item.priceTier || 'retail', price, total: normalizeMoney(qty * price) };
+      });
+
+      const nextSubtotal = normalizeMoney(normalizedItems.reduce((sum, item) => sum + item.total, 0));
+
+      await onUpdateOrder(editingOrder.id, {
+        items: normalizedItems,
+        subtotal: nextSubtotal,
+      });
+
+      if (selectedOrder && selectedOrder.id === editingOrder.id) {
+        setSelectedOrder(prev => prev ? { ...prev, items: normalizedItems, subtotal: nextSubtotal } : prev);
+      }
+
+      closeEditModal();
+    } catch (err) {
+      setEditError(err.message || 'An error occurred while updating the order. Please try again.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleCompletePayment = async () => {
@@ -200,6 +394,9 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
 
   // ── Render ─────────────────────────────────────────────────
 
+  const addProduct = (products || []).find(p => String(p.id) === String(addProductId));
+  const addProductVariants = addProduct?.hasVariants ? (addProduct.variants || []) : [];
+
   const TABS = [
     { key: 'pending',   label: 'Pending',    icon: 'bi-clock',        count: pendingOrders.length,   badge: 'bg-warning text-dark' },
     { key: 'onprocess', label: 'On Process', icon: 'bi-arrow-repeat', count: onProcessOrders.length, badge: 'bg-primary' },
@@ -270,6 +467,9 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                 <div key={order.id} className="border rounded mb-3">
                   <OrderCard order={order} />
                   <div className="px-3 pb-3 d-flex gap-2">
+                    <button className="btn btn-sm btn-outline-secondary" onClick={() => openEditModal(order)}>
+                      <i className="bi bi-pencil-square me-1"></i>Edit
+                    </button>
                     <button className="btn btn-sm btn-process flex-fill" onClick={() => openPayModal(order)}>
                       <i className="bi bi-check-circle me-1"></i>Ready — Pay
                     </button>
@@ -312,6 +512,146 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
           )}
         </div>
       </div>
+
+      {/* ── Edit Order Modal ── */}
+      {showEditModal && editingOrder && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="bi bi-pencil-square me-2"></i>Edit Order Before Payment
+                </h5>
+                <button className="btn-close" onClick={closeEditModal} />
+              </div>
+              <div className="modal-body">
+                <div className="small text-muted mb-2">
+                  Customer: <span className="fw-semibold text-dark">{editingOrder.customer?.name || 'Walk-in'}</span>
+                </div>
+
+                {editError && (
+                  <div className="alert alert-danger py-2 small">{editError}</div>
+                )}
+
+                {editItems.length === 0 ? (
+                  <div className="text-center text-muted py-3 border rounded mb-3">No items in this order.</div>
+                ) : (
+                  <div className="table-responsive mb-3">
+                    <table className="table table-sm align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Item</th>
+                          <th style={{ width: 90 }}>Qty</th>
+                          <th style={{ width: 140 }}>Unit Price</th>
+                          <th style={{ width: 120 }}>Total</th>
+                          <th style={{ width: 70 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editItems.map((item, idx) => (
+                          <tr key={`${item.productId || item.name}-${item.variantId || 'base'}-${idx}`}>
+                            <td>
+                              <div className="fw-semibold">{item.name}{item.variantName ? ` (${item.variantName})` : ''}</div>
+                              <div className="small text-muted">{item.unit || 'pc'}</div>
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                className="form-control form-control-sm"
+                                min="1"
+                                value={item.qty}
+                                onChange={e => updateEditItem(idx, { qty: e.target.value })}
+                              />
+                            </td>
+                            <td>
+                              <div className="d-flex align-items-center justify-content-end gap-2 small">
+                                {item.priceTier === 'wholesale' && <span className="badge bg-warning text-dark">W/S</span>}
+                                <span className="fw-semibold">₱{normalizeMoney(item.price).toFixed(2)}</span>
+                              </div>
+                            </td>
+                            <td className="text-end fw-semibold">₱{normalizeMoney(item.total).toFixed(2)}</td>
+                            <td className="text-center">
+                              <button className="btn btn-sm btn-outline-danger" onClick={() => removeEditItem(idx)}>
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="border rounded p-3 bg-light-subtle">
+                  <div className="fw-semibold mb-2">Add Product</div>
+                  <div className="row g-2">
+                    <div className="col-md-4">
+                      <label className="form-label small mb-1">Product</label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={addProductId}
+                        onChange={e => {
+                          setAddProductId(e.target.value);
+                          setAddVariantId('');
+                        }}
+                      >
+                        <option value="">Select product</option>
+                        {(products || []).map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label small mb-1">Variant</label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={addVariantId}
+                        onChange={e => setAddVariantId(e.target.value)}
+                        disabled={!addProduct?.hasVariants}
+                      >
+                        <option value="">{addProduct?.hasVariants ? 'Select variant' : 'No variant'}</option>
+                        {addProductVariants.map(v => (
+                          <option key={v.id} value={v.id}>{v.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label small mb-1">Qty</label>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        min="1"
+                        value={addQty}
+                        onChange={e => setAddQty(e.target.value)}
+                      />
+                    </div>
+                    <div className="col-md-2 d-grid">
+                      <label className="form-label small mb-1 text-transparent">Add</label>
+                      <button className="btn btn-sm btn-outline-primary" onClick={handleAddItemToEdit}>
+                        <i className="bi bi-plus-lg me-1"></i>Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="d-flex justify-content-between align-items-center mt-3">
+                  <span className="fw-semibold">Updated Subtotal</span>
+                  <span className="fs-5 fw-bold">₱{editedSubtotal.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-outline-secondary" onClick={closeEditModal} disabled={editSaving}>Cancel</button>
+                <button className="btn btn-dark" onClick={handleSaveEditedOrder} disabled={editSaving}>
+                  {editSaving
+                    ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    : <><i className="bi bi-check2 me-1"></i>Save Changes</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Payment Modal ── */}
       {showPayModal && selectedOrder && (
