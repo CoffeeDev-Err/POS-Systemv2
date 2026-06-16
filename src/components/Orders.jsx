@@ -678,10 +678,15 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                             <td>
                               <input
                                 type="number"
-                                className="form-control form-control-sm"
+                                className="form-control form-control-sm order-edit-qty-input"
                                 min="1"
                                 value={item.qty}
                                 onChange={e => updateEditItem(idx, { qty: e.target.value })}
+                                onFocus={e => e.target.select()}
+                                onClick={e => e.target.select()}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
                               />
                             </td>
                             <td>
@@ -740,10 +745,15 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                       <label className="form-label small mb-1">Qty</label>
                       <input
                         type="number"
-                        className="form-control form-control-sm"
+                        className="form-control form-control-sm order-edit-qty-input"
                         min="1"
                         value={addQty}
                         onChange={e => setAddQty(e.target.value)}
+                        onFocus={e => e.target.select()}
+                        onClick={e => e.target.select()}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                        }}
                       />
                     </div>
                     <div className="col-md-2 d-grid">
