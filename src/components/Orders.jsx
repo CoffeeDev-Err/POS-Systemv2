@@ -72,6 +72,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
   const [showEditModal, setShowEditModal]   = useState(false);
   const [editingOrder, setEditingOrder]     = useState(null);
   const [editItems, setEditItems]           = useState([]);
+  const [editQtyInputs, setEditQtyInputs]   = useState({});
   const [editError, setEditError]           = useState('');
   const [editSaving, setEditSaving]         = useState(false);
   const [addProductId, setAddProductId]     = useState('');
@@ -182,6 +183,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
     });
     setEditingOrder(order);
     setEditItems(seededItems);
+    setEditQtyInputs({});
     setEditError('');
     setAddProductId('');
     setAddVariantId('');
@@ -194,6 +196,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
     setShowEditModal(false);
     setEditingOrder(null);
     setEditItems([]);
+    setEditQtyInputs({});
     setEditError('');
   };
 
@@ -212,6 +215,7 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
 
   const removeEditItem = (idx) => {
     setEditItems(prev => prev.filter((_, i) => i !== idx));
+    setEditQtyInputs({});
   };
 
   const handleAddItemToEdit = () => {
@@ -677,11 +681,30 @@ export default function Orders({ orders, products, currentUser, settings, onUpda
                             </td>
                             <td>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 className="form-control form-control-sm order-edit-qty-input"
-                                min="1"
-                                value={item.qty}
-                                onChange={e => updateEditItem(idx, { qty: e.target.value })}
+                                value={editQtyInputs[idx] ?? String(item.qty)}
+                                onChange={e => {
+                                  const raw = e.target.value;
+                                  setEditQtyInputs(prev => ({ ...prev, [idx]: raw }));
+                                  if (raw.trim() === '') return;
+                                  const parsed = parseInt(raw, 10);
+                                  if (!Number.isNaN(parsed) && parsed > 0) {
+                                    updateEditItem(idx, { qty: parsed });
+                                  }
+                                }}
+                                onBlur={e => {
+                                  setEditQtyInputs(prev => {
+                                    const next = { ...prev };
+                                    delete next[idx];
+                                    return next;
+                                  });
+                                  const parsed = parseInt(e.target.value, 10);
+                                  if (!Number.isNaN(parsed) && parsed > 0) {
+                                    updateEditItem(idx, { qty: parsed });
+                                  }
+                                }}
                                 onFocus={e => e.target.select()}
                                 onClick={e => e.target.select()}
                                 onKeyDown={e => {
