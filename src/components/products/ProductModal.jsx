@@ -1,4 +1,4 @@
-const UNITS = ['pc', 'tray', 'btl', 'pack', 'kg', 'sachet', 'liter', 'box', 'dozen', 'crate'];
+const UNITS = ['pc', 'tray', 'btl', 'pack', 'kg', 'sack', 'case', 'sachet', 'liter', 'box', 'dozen', 'crate'];
 
 function genId() {
   return Math.random().toString(36).slice(2, 9);
