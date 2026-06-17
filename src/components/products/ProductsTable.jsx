@@ -1,5 +1,71 @@
 import { useState } from 'react';
 
+/**
+ * Formats stock display to show full packaging units + partial base units.
+ * Example: 370 kg with 25kg/sack → "14 sacks + 20 kg"
+ */
+function formatStockDisplay(product) {
+  if (!product) return '0';
+  
+  const stock = Number(product.stock || 0);
+  const baseUnit = product.hasVariants 
+    ? (product.baseUnit || 'pc')
+    : (product.baseUnit || product.unit || 'pc');
+
+  // Find the largest variant/conversion unit
+  let largestVariant = null;
+  let largestRate = 0;
+
+  if (product.hasVariants && Array.isArray(product.variants)) {
+    product.variants.forEach(v => {
+      const rate = Number(v.conversionRate || 0);
+      if (rate > largestRate) {
+        largestRate = rate;
+        largestVariant = {
+          name: v.name,
+          unit: v.unit || baseUnit,
+          rate: rate,
+        };
+      }
+    });
+  } else if (product.conversionRate && Number(product.conversionRate) > 1) {
+    largestRate = Number(product.conversionRate);
+    largestVariant = {
+      name: product.unit || 'pack',
+      unit: product.unit || 'pack',
+      rate: largestRate,
+    };
+  }
+
+  // Format with integer for full units, avoid trailing zeros for partial
+  const formatQty = (value) => {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n)) return '0';
+    if (Number.isInteger(n)) return String(n);
+    return n.toFixed(3).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  };
+
+  // If there's a packaging unit, show breakdown
+  if (largestVariant && largestRate > 1) {
+    const fullUnits = Math.floor(stock / largestRate);
+    const partialUnits = stock % largestRate;
+    
+    if (fullUnits === 0) {
+      // Only partial units
+      return `${formatQty(partialUnits)} ${baseUnit}`;
+    } else if (partialUnits === 0) {
+      // Only full units
+      return `${fullUnits} ${largestVariant.unit}`;
+    } else {
+      // Both full and partial
+      return `${fullUnits} ${largestVariant.unit} + ${formatQty(partialUnits)} ${baseUnit}`;
+    }
+  }
+
+  // No packaging unit, show base only
+  return `${formatQty(stock)} ${baseUnit}`;
+}
+
 export default function ProductsTable({ products, onEdit, onDelete }) {
   const [pageSize, setPageSize] = useState(25);
   
@@ -57,7 +123,7 @@ export default function ProductsTable({ products, onEdit, onDelete }) {
                           const wholesale = v.priceWholesale ? Number(v.priceWholesale) : null;
                           return (
                             <span key={v.id} className="badge bg-info text-dark me-1 fw-normal" style={{ fontSize: '0.68rem' }}>
-                              {v.name} — ₱{retail.toFixed(2)}{wholesale ? ` / W₱${wholesale.toFixed(2)}` : ''}/{v.unit}
+                              {v.name} - ₱{retail.toFixed(2)}{wholesale ? ` / W₱${wholesale.toFixed(2)}` : ''}/{v.unit}
                             </span>
                           );
                         })}
@@ -93,7 +159,7 @@ export default function ProductsTable({ products, onEdit, onDelete }) {
                   </td>
                   <td className="text-center">
                     <span className={`badge ${stockColor}`}>
-                      {p.stock} {stockUnit}
+                      {formatStockDisplay(p)}
                     </span>
                   </td>
                   <td className="text-center text-muted small">{p.lowStockAlert} {stockUnit}</td>

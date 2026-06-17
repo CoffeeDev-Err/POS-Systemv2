@@ -83,7 +83,6 @@ export async function createStockMovement(payload) {
   const { updatedProduct, ...movement } = await fs.createStockMovement(payload);
   return { movement, product: updatedProduct };
 }
-export const openPackToBase = fs.openPackToBase;
 
 // ---- settings ----
 export const fetchSettings = fs.fetchSettings;

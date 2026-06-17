@@ -20,7 +20,6 @@ import {
   deleteUser,
   createTransaction,
   createStockMovement,
-  openPackToBase,
   createExpense,
   updateSettings,
   fetchOrders,
@@ -239,21 +238,6 @@ export function useAppData(currentUser) {
     return res;
   }, [logAction, mergeProducts, refreshAuditLogs]);
 
-  const handleOpenPack = useCallback(async (payload) => {
-    const res = await openPackToBase(payload);
-    if (Array.isArray(res?.movements) && res.movements.length > 0) {
-      setStockMovements(prev => [...prev, ...res.movements]);
-    }
-    mergeProducts(res?.updatedProducts || []);
-
-    const fromQty = Number(payload?.fromQty || 0);
-    const basePerPack = Number(payload?.basePerPack || 0);
-    const toQty = Number((fromQty * basePerPack).toFixed(4));
-    await logAction(`Opened packaging: ${fromQty} -> ${toQty} base units`);
-    await refreshAuditLogs();
-    return res;
-  }, [logAction, mergeProducts, refreshAuditLogs]);
-
   const handleCreateExpense = useCallback(async (payload) => {
     const expense = await createExpense(payload);
     setExpenses(prev => [expense, ...prev]);
@@ -421,7 +405,6 @@ export function useAppData(currentUser) {
     handleDeleteUser,
     handleCreateTransaction,
     handleStockIn,
-    handleOpenPack,
     handleCreateExpense,
     handleSaveSettings,
     handleCreateOrder,
