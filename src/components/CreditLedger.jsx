@@ -1,6 +1,13 @@
 import { useState, useMemo } from 'react';
 
 const fmt = (n) => `₱${Number(n || 0).toFixed(2)}`;
+const todayYmd = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
 const STATUS_BADGE = {
   unpaid:  { cls: 'bg-danger',   label: 'Unpaid' },
@@ -133,6 +140,10 @@ export default function CreditLedger({
   // Credit tab filters
   const [statusFilter, setStatusFilter] = useState('active');
   const [search, setSearch] = useState('');
+  const [creditDateFrom, setCreditDateFrom] = useState('');
+  const [creditDateTo, setCreditDateTo] = useState(todayYmd());
+  const [cashDateFrom, setCashDateFrom] = useState('');
+  const [cashDateTo, setCashDateTo] = useState(todayYmd());
 
   // Payment modal
   const [paymentTarget, setPaymentTarget] = useState(null);
@@ -174,19 +185,30 @@ export default function CreditLedger({
       );
     }
 
+    // Date filtering
+    if (creditDateFrom || creditDateTo) {
+      list = list.filter(c => {
+        const creditDate = c.startDate || '';
+        if (!creditDate) return false;
+        if (creditDateFrom && creditDate < creditDateFrom) return false;
+        if (creditDateTo && creditDate > creditDateTo) return false;
+        return true;
+      });
+    }
+
     return list;
-  }, [credits, statusFilter, search]);
+  }, [credits, statusFilter, search, creditDateFrom, creditDateTo]);
 
   // ── Stats ───────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const all = credits || [];
+    const list = filteredCredits;
     return {
-      totalCredit: all.reduce((s, c) => s + (c.totalAmount || 0), 0),
-      totalOutstanding: all.filter(c => c.status !== 'paid').reduce((s, c) => s + (c.remainingBalance || 0), 0),
-      overdueCount: all.filter(c => isOverdue(c)).length,
-      unpaidCount: all.filter(c => c.status !== 'paid').length,
+      totalCredit: list.reduce((s, c) => s + (c.totalAmount || 0), 0),
+      totalOutstanding: list.filter(c => c.status !== 'paid').reduce((s, c) => s + (c.remainingBalance || 0), 0),
+      overdueCount: list.filter(c => isOverdue(c)).length,
+      unpaidCount: list.filter(c => c.status !== 'paid').length,
     };
-  }, [credits]);
+  }, [filteredCredits]);
 
   // ── Cash Ledger list ────────────────────────────────────────────────────────
   const cashLedgerRows = useMemo(() => {
@@ -218,6 +240,21 @@ export default function CreditLedger({
       (b.date || '').localeCompare(a.date || '')
     );
   }, [transactions, credits]);
+
+  const filteredCashLedgerRows = useMemo(() => {
+    return cashLedgerRows.filter(row => {
+      const rowDate = row.date || '';
+      if (!rowDate) return false;
+      if (cashDateFrom && rowDate < cashDateFrom) return false;
+      if (cashDateTo && rowDate > cashDateTo) return false;
+      return true;
+    });
+  }, [cashLedgerRows, cashDateFrom, cashDateTo]);
+
+  const cashGrandTotal = useMemo(
+    () => filteredCashLedgerRows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [filteredCashLedgerRows]
+  );
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const openPaymentModal = (credit) => {
@@ -351,6 +388,38 @@ export default function CreditLedger({
             />
           </div>
 
+          {/* Date Range Filter */}
+          <div className="card card-custom mb-3">
+            <div className="card-body py-3">
+              <div className="row g-2 align-items-end">
+                <div className="col-12 col-md-3">
+                  <label className="form-label small fw-semibold mb-1">From Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm"
+                    value={creditDateFrom}
+                    onChange={e => setCreditDateFrom(e.target.value)}
+                  />
+                </div>
+                <div className="col-12 col-md-3">
+                  <label className="form-label small fw-semibold mb-1">To Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm"
+                    value={creditDateTo}
+                    onChange={e => setCreditDateTo(e.target.value)}
+                  />
+                </div>
+                <div className="col-12 col-md-6 d-flex align-items-center">
+                  <div className="ms-auto">
+                    <span className="text-muted small me-2">Grand Total:</span>
+                    <strong className="fs-5">{fmt(stats.totalCredit)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Credit cards */}
           {filteredCredits.length === 0 ? (
             <div className="text-center text-muted py-5">
@@ -376,12 +445,54 @@ export default function CreditLedger({
       {activeTab === 'cash' && (
         <>
           <div className="mb-3 text-muted small">
-            Showing all cash, GCash, and bank transfer transactions, plus fully settled credits.
+            Showing cash, GCash, and bank transfer transactions, plus fully settled credits within selected dates.
           </div>
-          {cashLedgerRows.length === 0 ? (
+
+          <div className="card card-custom mb-3">
+            <div className="card-body py-3">
+              <div className="row g-2 align-items-end">
+                <div className="col-12 col-md-3">
+                  <label className="form-label small fw-semibold mb-1">From Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm"
+                    value={cashDateFrom}
+                    onChange={e => setCashDateFrom(e.target.value)}
+                  />
+                </div>
+                <div className="col-12 col-md-3">
+                  <label className="form-label small fw-semibold mb-1">To Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm"
+                    value={cashDateTo}
+                    onChange={e => setCashDateTo(e.target.value)}
+                  />
+                </div>
+                <div className="col-12 col-md-3">
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => {
+                      setCashDateFrom('');
+                      setCashDateTo(todayYmd());
+                    }}
+                  >
+                    Reset Dates
+                  </button>
+                </div>
+                <div className="col-12 col-md-3 text-md-end">
+                  <div className="small text-muted">Grand Total</div>
+                  <div className="fw-bold fs-5 text-success">{fmt(cashGrandTotal)}</div>
+                  <div className="small text-muted">{filteredCashLedgerRows.length} record(s)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {filteredCashLedgerRows.length === 0 ? (
             <div className="text-center text-muted py-5">
               <i className="bi bi-inbox display-4 d-block mb-2" />
-              No records found.
+              No records found for selected dates.
             </div>
           ) : (
             <div className="card card-custom">
@@ -397,7 +508,7 @@ export default function CreditLedger({
                     </tr>
                   </thead>
                   <tbody>
-                    {cashLedgerRows.map(row => (
+                    {filteredCashLedgerRows.map(row => (
                       <tr key={`${row.type}-${row.id}`}>
                         <td>{row.date || '—'}</td>
                         <td>{row.customerName}</td>
@@ -416,6 +527,12 @@ export default function CreditLedger({
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4} className="text-end fw-bold">Grand Total</td>
+                      <td className="text-end fw-bold text-success">{fmt(cashGrandTotal)}</td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>

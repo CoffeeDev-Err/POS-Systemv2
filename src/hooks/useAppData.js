@@ -20,6 +20,7 @@ import {
   deleteUser,
   createTransaction,
   createStockMovement,
+  openPackToBase,
   createExpense,
   updateSettings,
   fetchOrders,
@@ -229,7 +230,26 @@ export function useAppData(currentUser) {
     setStockMovements(prev => [...prev, res.movement]);
     mergeProducts([res.product]);
     const productLabel = res?.product?.name || payload?.productName || payload?.productId || 'Unknown product';
-    await logAction(`Stock-in: ${payload.qty} × "${productLabel}"`);
+    const inputLabel = (payload?.inputQty && payload?.inputUnit)
+      ? `${payload.inputQty} ${payload.inputUnit}`
+      : `${payload.qty}`;
+    const baseLabel = payload?.baseUnit ? `${payload.qty} ${payload.baseUnit}` : `${payload.qty}`;
+    await logAction(`Stock-in: ${inputLabel} -> ${baseLabel} "${productLabel}"`);
+    await refreshAuditLogs();
+    return res;
+  }, [logAction, mergeProducts, refreshAuditLogs]);
+
+  const handleOpenPack = useCallback(async (payload) => {
+    const res = await openPackToBase(payload);
+    if (Array.isArray(res?.movements) && res.movements.length > 0) {
+      setStockMovements(prev => [...prev, ...res.movements]);
+    }
+    mergeProducts(res?.updatedProducts || []);
+
+    const fromQty = Number(payload?.fromQty || 0);
+    const basePerPack = Number(payload?.basePerPack || 0);
+    const toQty = Number((fromQty * basePerPack).toFixed(4));
+    await logAction(`Opened packaging: ${fromQty} -> ${toQty} base units`);
     await refreshAuditLogs();
     return res;
   }, [logAction, mergeProducts, refreshAuditLogs]);
@@ -401,6 +421,7 @@ export function useAppData(currentUser) {
     handleDeleteUser,
     handleCreateTransaction,
     handleStockIn,
+    handleOpenPack,
     handleCreateExpense,
     handleSaveSettings,
     handleCreateOrder,

@@ -3,14 +3,71 @@ import { useMemo, useState } from 'react';
 // Products whose name contains "egg" are considered harvest/poultry products
 const isPoultryProduct = (p) => p.name.toLowerCase().includes('egg');
 
-export default function Inventory({ products, categories, stockMovements, onStockIn, currentUser }) {
+const formatQty = (value) => {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return '0';
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(3).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+};
+
+function getStockInUnitOptions(product) {
+  if (!product) return [];
+
+  const baseUnit = product.hasVariants
+    ? (product.baseUnit || 'pc')
+    : (product.baseUnit || product.unit || 'pc');
+
+  const options = [{
+    key: 'base',
+    label: `${baseUnit} (base unit)`,
+    unit: baseUnit,
+    multiplier: 1,
+  }];
+
+  if (product.hasVariants) {
+    (product.variants || []).forEach(v => {
+      const mult = Number(v.conversionRate) || 1;
+      options.push({
+        key: `variant:${v.id}`,
+        label: `${v.name} (${v.unit})`,
+        unit: v.unit || baseUnit,
+        multiplier: mult,
+      });
+    });
+  } else {
+    const mult = Number(product.conversionRate) || 1;
+    if (product.unit && product.unit !== baseUnit && mult > 0) {
+      options.push({
+        key: 'main-unit',
+        label: `${product.unit}`,
+        unit: product.unit,
+        multiplier: mult,
+      });
+    }
+  }
+
+  return options;
+}
+
+export default function Inventory({ products, categories, stockMovements, onStockIn, onOpenPack, currentUser }) {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [showStockIn, setShowStockIn] = useState(false);
   const [openCategories, setOpenCategories] = useState({});
-  const [stockInForm, setStockInForm] = useState({ productId: '', qty: '', note: '' });
+  const [stockInForm, setStockInForm] = useState({ productId: '', unitKey: 'base', qty: '', note: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const [showOpenPack, setShowOpenPack] = useState(false);
+  const [openPackForm, setOpenPackForm] = useState({
+    fromProductId: '',
+    toProductId: '',
+    fromQty: '',
+    basePerPack: '',
+    note: 'Open packaging',
+  });
+  const [openPackSaving, setOpenPackSaving] = useState(false);
+  const [openPackError, setOpenPackError] = useState('');
 
   const [showHarvest, setShowHarvest] = useState(false);
   const [harvestForm, setHarvestForm] = useState({ productId: '', qty: '', variantQtys: {}, note: 'Harvest' });
@@ -30,6 +87,27 @@ export default function Inventory({ products, categories, stockMovements, onStoc
     const product = products.find(p => String(p.id) === String(stockInForm.productId));
     if (!product || !stockInForm.qty) return;
 
+    const inputQty = Number(stockInForm.qty || 0);
+    if (!Number.isFinite(inputQty) || inputQty <= 0) {
+      setError('Please enter a valid stock-in quantity.');
+      return;
+    }
+
+    const unitOptions = getStockInUnitOptions(product);
+    const selectedUnit = unitOptions.find(u => u.key === stockInForm.unitKey) || unitOptions[0];
+    if (!selectedUnit) {
+      setError('No valid stock-in unit is configured for this product.');
+      return;
+    }
+
+    const baseUnit = product.hasVariants
+      ? (product.baseUnit || 'pc')
+      : (product.baseUnit || product.unit || 'pc');
+    const baseQty = Number((inputQty * Number(selectedUnit.multiplier || 1)).toFixed(4));
+    const conversionText = Number(selectedUnit.multiplier || 1) !== 1
+      ? `${formatQty(inputQty)} ${selectedUnit.unit} x ${formatQty(selectedUnit.multiplier)} = ${formatQty(baseQty)} ${baseUnit}`
+      : `${formatQty(baseQty)} ${baseUnit}`;
+
     setSaving(true);
     setError('');
 
@@ -38,17 +116,79 @@ export default function Inventory({ products, categories, stockMovements, onStoc
       await onStockIn({
         productId: product.id,
         product: product.name,
-        qty: parseInt(stockInForm.qty),
-        note: stockInForm.note || 'Manual stock-in',
+        qty: baseQty,
+        inputQty,
+        inputUnit: selectedUnit.unit,
+        inputMultiplier: Number(selectedUnit.multiplier || 1),
+        baseUnit,
+        note: `${stockInForm.note || 'Manual stock-in'} (${conversionText})`,
         date: now.toISOString().slice(0, 10),
         time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
       });
-      setStockInForm({ productId: '', qty: '', note: '' });
+      setStockInForm({ productId: '', unitKey: 'base', qty: '', note: '' });
       setShowStockIn(false);
     } catch (err) {
       setError(err.message || 'An error occurred while recording the stock entry. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOpenPackAction = async () => {
+    if (!onOpenPack) return;
+
+    const fromProduct = products.find(p => String(p.id) === String(openPackForm.fromProductId));
+    const toProduct = products.find(p => String(p.id) === String(openPackForm.toProductId));
+    const fromQty = Number(openPackForm.fromQty || 0);
+    const basePerPack = Number(openPackForm.basePerPack || 0);
+
+    if (!fromProduct || !toProduct) {
+      setOpenPackError('Please select both source and target products.');
+      return;
+    }
+    if (fromProduct.id === toProduct.id) {
+      setOpenPackError('Source and target products must be different.');
+      return;
+    }
+    if (!Number.isFinite(fromQty) || fromQty <= 0) {
+      setOpenPackError('Please enter a valid quantity to open.');
+      return;
+    }
+    if (!Number.isFinite(basePerPack) || basePerPack <= 0) {
+      setOpenPackError('Please enter a valid conversion quantity.');
+      return;
+    }
+
+    setOpenPackSaving(true);
+    setOpenPackError('');
+
+    try {
+      const now = new Date();
+      await onOpenPack({
+        fromProductId: fromProduct.id,
+        fromProductName: fromProduct.name,
+        toProductId: toProduct.id,
+        toProductName: toProduct.name,
+        fromQty,
+        basePerPack,
+        note: openPackForm.note || 'Open packaging',
+        inputBy: currentUser?.name || '',
+        date: now.toISOString().slice(0, 10),
+        time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+      });
+
+      setOpenPackForm({
+        fromProductId: '',
+        toProductId: '',
+        fromQty: '',
+        basePerPack: '',
+        note: 'Open packaging',
+      });
+      setShowOpenPack(false);
+    } catch (err) {
+      setOpenPackError(err.message || 'Failed to open packaging.');
+    } finally {
+      setOpenPackSaving(false);
     }
   };
 
@@ -161,6 +301,9 @@ export default function Inventory({ products, categories, stockMovements, onStoc
           </select>
         </div>
         <div className="d-flex gap-2">
+          <button className="btn btn-outline-warning" onClick={() => setShowOpenPack(true)}>
+            <i className="bi bi-arrow-left-right me-2"></i>Open Packaging
+          </button>
           <button className="btn btn-outline-success" onClick={() => setShowHarvest(true)}>
             <i className="bi bi-basket me-2"></i>Harvest Input
           </button>
@@ -288,7 +431,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                     h.type === 'stock-in' ? 'bg-success' :
                     h.type === 'sale' ? 'bg-danger' : 'bg-warning text-dark'
                   }`}>
-                    {(h.type === 'stock-in' || h.type === 'harvest') ? '+' : '-'}{h.qty}
+                    {(h.type === 'stock-in' || h.type === 'harvest' || h.type === 'open-pack-in') ? '+' : '-'}{formatQty(h.qty)}{h.unit ? ` ${h.unit}` : ''}
                   </span>
                                 </div>
                               </li>
@@ -439,6 +582,127 @@ export default function Inventory({ products, categories, stockMovements, onStoc
         );
       })()}
 
+      {/* Open Packaging Modal */}
+      {showOpenPack && (() => {
+        const fromProduct = products.find(p => String(p.id) === String(openPackForm.fromProductId));
+        const toProduct = products.find(p => String(p.id) === String(openPackForm.toProductId));
+        const fromQty = Number(openPackForm.fromQty || 0);
+        const basePerPack = Number(openPackForm.basePerPack || 0);
+        const toQty = Number.isFinite(fromQty) && Number.isFinite(basePerPack)
+          ? Number((fromQty * basePerPack).toFixed(4))
+          : 0;
+
+        const fromUnit = fromProduct?.baseUnit || fromProduct?.unit || 'pack';
+        const toUnit = toProduct?.baseUnit || toProduct?.unit || 'base';
+        const canSave = !!fromProduct && !!toProduct && fromProduct.id !== toProduct.id && fromQty > 0 && basePerPack > 0;
+
+        return (
+          <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title"><i className="bi bi-arrow-left-right me-2 text-warning"></i>Open Packaging</h5>
+                  <button className="btn-close" onClick={() => { setShowOpenPack(false); setOpenPackError(''); }} aria-label="Close"></button>
+                </div>
+                <div className="modal-body">
+                  {openPackError && (
+                    <div className="alert alert-danger py-2 small">
+                      <i className="bi bi-exclamation-circle me-1"></i>{openPackError}
+                    </div>
+                  )}
+
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Source Product (pack/sack) *</label>
+                    <select
+                      className="form-select"
+                      value={openPackForm.fromProductId}
+                      onChange={e => setOpenPackForm(prev => ({ ...prev, fromProductId: e.target.value }))}
+                    >
+                      <option value="">-- Choose source product --</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} (Stock: {formatQty(p.stock)} {p.baseUnit || p.unit || ''})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Target Product (base selling unit) *</label>
+                    <select
+                      className="form-select"
+                      value={openPackForm.toProductId}
+                      onChange={e => setOpenPackForm(prev => ({ ...prev, toProductId: e.target.value }))}
+                    >
+                      <option value="">-- Choose target product --</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} (Stock: {formatQty(p.stock)} {p.baseUnit || p.unit || ''})</option>
+                      ))}
+                    </select>
+                    <div className="text-muted small mt-1">
+                      Example: Source = Rice (sack), Target = Rice (kg)
+                    </div>
+                  </div>
+
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <label className="form-label fw-semibold">Qty to Open *</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        min="0.001"
+                        step="0.001"
+                        value={openPackForm.fromQty}
+                        onChange={e => setOpenPackForm(prev => ({ ...prev, fromQty: e.target.value }))}
+                        placeholder="e.g. 1"
+                      />
+                      <div className="text-muted small mt-1">in {fromUnit}</div>
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label fw-semibold">Base per Pack *</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        min="0.001"
+                        step="0.001"
+                        value={openPackForm.basePerPack}
+                        onChange={e => setOpenPackForm(prev => ({ ...prev, basePerPack: e.target.value }))}
+                        placeholder="e.g. 25"
+                      />
+                      <div className="text-muted small mt-1">{toUnit} per {fromUnit}</div>
+                    </div>
+                  </div>
+
+                  <div className="mb-3 mt-3">
+                    <label className="form-label fw-semibold">Note</label>
+                    <input
+                      className="form-control"
+                      value={openPackForm.note}
+                      onChange={e => setOpenPackForm(prev => ({ ...prev, note: e.target.value }))}
+                      placeholder="e.g. Opened sack for per-kilo sales"
+                    />
+                  </div>
+
+                  {canSave && (
+                    <div className="alert alert-warning py-2 small mb-0">
+                      <i className="bi bi-arrow-left-right me-1"></i>
+                      Convert: <strong>-{formatQty(fromQty)} {fromUnit}</strong> from source and <strong>+{formatQty(toQty)} {toUnit}</strong> to target.
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-outline-secondary" onClick={() => { setShowOpenPack(false); setOpenPackError(''); }}>Cancel</button>
+                  <button className="btn btn-warning text-dark" onClick={handleOpenPackAction} disabled={openPackSaving || !canSave}>
+                    {openPackSaving
+                      ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                      : <><i className="bi bi-check2 me-2"></i>Confirm Open Pack</>
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Stock In Modal */}
       {showStockIn && (
         <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
@@ -456,7 +720,7 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                 )}
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Select Product *</label>
-                  <select className="form-select" value={stockInForm.productId} onChange={e => setStockInForm({ ...stockInForm, productId: e.target.value })}>
+                  <select className="form-select" value={stockInForm.productId} onChange={e => setStockInForm({ ...stockInForm, productId: e.target.value, unitKey: 'base' })}>
                     <option value="">-- Choose product --</option>
                     {products.map(p => {
                       const unit = p.hasVariants ? (p.baseUnit || 'pc') : p.unit;
@@ -467,18 +731,45 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                 <div className="mb-3">
                   {(() => {
                     const selProd = products.find(p => String(p.id) === String(stockInForm.productId));
-                    const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || '');
+                    const baseUnit = selProd?.hasVariants
+                      ? (selProd.baseUnit || 'pc')
+                      : (selProd?.baseUnit || selProd?.unit || '');
+                    const unitOptions = selProd ? getStockInUnitOptions(selProd) : [];
+                    const selectedUnit = unitOptions.find(u => u.key === stockInForm.unitKey) || unitOptions[0];
+                    const inputQty = Number(stockInForm.qty || 0);
+                    const baseQty = (selectedUnit && Number.isFinite(inputQty) && inputQty > 0)
+                      ? Number((inputQty * Number(selectedUnit.multiplier || 1)).toFixed(4))
+                      : 0;
                     return (
                       <>
+                        <label className="form-label fw-semibold">Stock-in Unit</label>
+                        <select
+                          className="form-select mb-2"
+                          value={stockInForm.unitKey}
+                          onChange={e => setStockInForm({ ...stockInForm, unitKey: e.target.value })}
+                          disabled={!selProd}
+                        >
+                          {unitOptions.map(opt => (
+                            <option key={opt.key} value={opt.key}>
+                              {opt.label} {opt.multiplier !== 1 ? `(x${formatQty(opt.multiplier)} ${baseUnit})` : ''}
+                            </option>
+                          ))}
+                        </select>
                         <label className="form-label fw-semibold">
                           Quantity to Add *
-                          {unit && <span className="text-muted fw-normal ms-1">(in {unit}s)</span>}
+                          {selectedUnit?.unit && <span className="text-muted fw-normal ms-1">(in {selectedUnit.unit}s)</span>}
                         </label>
-                        <input type="number" className="form-control" value={stockInForm.qty} onChange={e => setStockInForm({ ...stockInForm, qty: e.target.value })} placeholder="Enter quantity" min="1" />
+                        <input type="number" className="form-control" value={stockInForm.qty} onChange={e => setStockInForm({ ...stockInForm, qty: e.target.value })} placeholder="Enter quantity" min="0.001" step="0.001" />
                         {selProd?.hasVariants && (
                           <div className="text-muted small mt-1">
                             <i className="bi bi-info-circle me-1"></i>
-                            This product has variants. Enter base units ({unit}s) received.
+                            This product has variants. System auto-converts your selected unit to base units.
+                          </div>
+                        )}
+                        {selProd && selectedUnit && Number(stockInForm.qty || 0) > 0 && (
+                          <div className="alert alert-info py-2 small mt-2 mb-0">
+                            <i className="bi bi-arrow-left-right me-1"></i>
+                            Conversion: {formatQty(stockInForm.qty)} {selectedUnit.unit} x {formatQty(selectedUnit.multiplier)} = <strong>{formatQty(baseQty)} {baseUnit}</strong>
                           </div>
                         )}
                       </>
@@ -495,9 +786,17 @@ export default function Inventory({ products, categories, stockMovements, onStoc
                     <i className="bi bi-info-circle me-1"></i>
                     {(() => {
                       const selProd = products.find(p => String(p.id) === String(stockInForm.productId));
-                      const unit = selProd?.hasVariants ? (selProd.baseUnit || 'pc') : (selProd?.unit || 'unit');
-                      const newQty = (selProd?.stock || 0) + parseInt(stockInForm.qty || 0);
-                      return <>New stock will be: <strong>{newQty} {unit}s</strong></>;
+                      const baseUnit = selProd?.hasVariants
+                        ? (selProd.baseUnit || 'pc')
+                        : (selProd?.baseUnit || selProd?.unit || 'unit');
+                      const unitOptions = selProd ? getStockInUnitOptions(selProd) : [];
+                      const selectedUnit = unitOptions.find(u => u.key === stockInForm.unitKey) || unitOptions[0];
+                      const inputQty = Number(stockInForm.qty || 0);
+                      const baseQty = (selectedUnit && Number.isFinite(inputQty) && inputQty > 0)
+                        ? Number((inputQty * Number(selectedUnit.multiplier || 1)).toFixed(4))
+                        : 0;
+                      const newQty = Number(selProd?.stock || 0) + baseQty;
+                      return <>New stock will be: <strong>{formatQty(newQty)} {baseUnit}</strong></>;
                     })()}
                   </div>
                 )}
