@@ -24,20 +24,77 @@ function waitForCurrentUser() {
   });
 }
 
+function normalizeUsername(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function toSyntheticEmail(username) {
+  return `${normalizeUsername(username).replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
+}
+
 // ---- auth ----
 export async function login(username, password) {
-  const snap = await getDocs(query(collection(db, "users"), where("username", "==", username)));
-  if (snap.empty) throw new Error("Invalid username or password. Please check your credentials and try again.");
-  const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-  if (userData.active === false) throw new Error("Your account has been deactivated. Please contact your administrator.");
+  const normalizedUsername = normalizeUsername(username);
+  if (!normalizedUsername) {
+    throw new Error('Please enter your username.');
+  }
 
-  // Use stored email, or fall back to the synthetic email format used during account creation
-  const email = userData.email || `${username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
-  await loginWithEmail(email, password);
-  const user = { id: userData.id, ...userData };
-  delete user.password;
+  // Prefer normalized field, but stay backward-compatible with old records.
+  const candidates = new Map();
 
-  return { user, token: user.id };
+  const normalizedSnap = await getDocs(query(collection(db, 'users'), where('usernameNormalized', '==', normalizedUsername)));
+  normalizedSnap.docs.forEach(d => candidates.set(d.id, { id: d.id, ...d.data() }));
+
+  if (candidates.size === 0) {
+    const exactSnap = await getDocs(query(collection(db, 'users'), where('username', '==', normalizedUsername)));
+    exactSnap.docs.forEach(d => candidates.set(d.id, { id: d.id, ...d.data() }));
+  }
+
+  if (candidates.size === 0) {
+    const allSnap = await getDocs(collection(db, 'users'));
+    allSnap.docs.forEach((d) => {
+      const data = d.data() || {};
+      if (normalizeUsername(data.username) === normalizedUsername) {
+        candidates.set(d.id, { id: d.id, ...data });
+      }
+    });
+  }
+
+  if (candidates.size === 0) {
+    throw new Error('Invalid username or password. Please check your credentials and try again.');
+  }
+
+  const activeCandidates = Array.from(candidates.values()).filter(u => u.active !== false);
+  if (activeCandidates.length === 0) {
+    throw new Error('Your account has been deactivated. Please contact your administrator.');
+  }
+
+  let sawCredentialError = false;
+  for (const candidate of activeCandidates) {
+    const email = candidate.email || toSyntheticEmail(candidate.username || normalizedUsername);
+    try {
+      await loginWithEmail(email, password);
+      const user = { ...candidate, username: normalizeUsername(candidate.username) };
+      delete user.password;
+      return { user, token: user.id };
+    } catch (err) {
+      const code = err?.code || '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        sawCredentialError = true;
+        continue;
+      }
+      if (code === 'auth/user-disabled') {
+        throw new Error('This account has been disabled. Contact your administrator.');
+      }
+      throw err;
+    }
+  }
+
+  if (sawCredentialError) {
+    throw new Error('Invalid username or password. Please check your credentials and try again.');
+  }
+
+  throw new Error('Unable to sign in. Please try again.');
 }
 
 export async function fetchMe() {

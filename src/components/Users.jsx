@@ -20,6 +20,7 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [openLogUsers, setOpenLogUsers] = useState({});
+  const isEditingSelf = editUser?.id === currentUser?.id;
 
   const groupedLogs = useMemo(() => {
     const grouped = new Map();
@@ -32,10 +33,27 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
   }, [auditLogs]);
 
   const openAdd = () => { setForm(EMPTY_USER); setEditUser(null); setShowModal(true); setShowPass(true); setError(''); };
-  const openEdit = (u) => { setForm({ ...u }); setEditUser(u); setShowModal(true); setShowPass(false); setError(''); };
+  const openEdit = (u) => {
+    setForm({
+      name: u.name || '',
+      username: u.username || '',
+      role: u.role || 'cashier',
+      active: u.active !== false,
+      password: '',
+      currentPassword: '',
+    });
+    setEditUser(u);
+    setShowModal(true);
+    setShowPass(false);
+    setError('');
+  };
 
   const handleSave = async () => {
     if (!form.name || !form.username || (!editUser && !form.password)) return;
+    if (editUser && form.password && !form.currentPassword) {
+      setError('Current password is required to set a new password.');
+      return;
+    }
     setSaving(true);
     setError('');
 
@@ -177,7 +195,6 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                             <button
                               className="btn btn-outline-secondary btn-sm"
                               onClick={() => openEdit(u)}
-                              disabled={isSelf}
                               title="Edit"
                               aria-label={`Edit ${u.name}`}
                             >
@@ -286,11 +303,21 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                   </div>
                   <div className="col-6">
                     <label className="form-label fw-semibold">Role *</label>
-                    <select className="form-select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+                    <select
+                      className="form-select"
+                      value={form.role}
+                      onChange={e => setForm({ ...form, role: e.target.value })}
+                      disabled={isEditingSelf}
+                    >
                       <option value="cashier">Cashier</option>
                       <option value="admin">Admin</option>
                       <option value="superadmin">Super Admin</option>
                     </select>
+                    {isEditingSelf && (
+                      <div className="text-muted small mt-1">
+                        <i className="bi bi-info-circle me-1"></i>Your own role cannot be changed here.
+                      </div>
+                    )}
                   </div>
                   <div className="col-12">
                     <label className="form-label fw-semibold">{editUser ? 'New Password (leave blank to keep)' : 'Password *'}</label>
@@ -315,9 +342,21 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                   )}
                   <div className="col-12">
                     <div className="form-check form-switch">
-                      <input className="form-check-input" type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} id="activeCheck" />
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        checked={form.active}
+                        onChange={e => setForm({ ...form, active: e.target.checked })}
+                        id="activeCheck"
+                        disabled={isEditingSelf}
+                      />
                       <label className="form-check-label" htmlFor="activeCheck">Account Active</label>
                     </div>
+                    {isEditingSelf && (
+                      <div className="text-muted small mt-1">
+                        <i className="bi bi-info-circle me-1"></i>Your own account cannot be deactivated.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

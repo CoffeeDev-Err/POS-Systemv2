@@ -29,6 +29,14 @@ function toLocalDateTimeString(date = new Date()) {
   return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
 }
 
+function normalizeUsername(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function toSyntheticEmail(username) {
+  return `${normalizeUsername(username).replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
+}
+
 function sanitizeOrderItemsForAudit(items = []) {
   return (items || []).map(item => ({
     productId: item.productId || '',
@@ -76,29 +84,87 @@ export async function deleteCategory(name) {
 export const fetchUsers = () => getDocs(col("users")).then(toList);
 
 export async function createUser(payload) {
+  const username = normalizeUsername(payload.username);
+  if (!username) throw new Error('Username is required.');
+
+  // Enforce username uniqueness to avoid ambiguous login records.
+  const existing = await getDocs(query(col('users'), where('usernameNormalized', '==', username)));
+  let usernameTaken = !existing.empty;
+  if (!usernameTaken) {
+    const allUsers = await getDocs(col('users'));
+    usernameTaken = allUsers.docs.some(d => normalizeUsername(d.data()?.username) === username);
+  }
+
+  if (usernameTaken) {
+    throw new Error('Username is already taken. Please choose another username.');
+  }
+
   // Derive a synthetic email so Firebase Auth has something to work with.
   // Users only ever log in with their username — the email is internal.
-  const email = `${payload.username.toLowerCase().replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
-  await createAuthUser(email, payload.password);
+  const email = toSyntheticEmail(username);
+  const uid = await createAuthUser(email, payload.password);
+
   // Never store plaintext password in Firestore
   const { password: _, currentPassword: __, ...safe } = payload;
-  const ref = await addDoc(col("users"), { ...safe, email, createdAt: serverTimestamp() });
-  return { id: ref.id, ...safe, email };
+  const data = {
+    ...safe,
+    username,
+    usernameNormalized: username,
+    active: payload.active !== false,
+    email,
+    createdAt: serverTimestamp(),
+  };
+
+  // Keep Firestore user id aligned with Firebase Auth uid for future compatibility.
+  await setDoc(doc(db, 'users', uid), data, { merge: true });
+  return { id: uid, ...data };
 }
 
 export async function updateUser(id, payload) {
+  const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists()) throw new Error('User not found.');
+  const current = snap.data();
+
+  const currentUsername = normalizeUsername(current.username);
+  const nextUsername = payload.username !== undefined ? normalizeUsername(payload.username) : currentUsername;
+  if (!nextUsername) throw new Error('Username is required.');
+
+  if (nextUsername !== currentUsername) {
+    const dup = await getDocs(query(col('users'), where('usernameNormalized', '==', nextUsername)));
+    let hasOtherUser = dup.docs.some(d => d.id !== id);
+    if (!hasOtherUser) {
+      const allUsers = await getDocs(col('users'));
+      hasOtherUser = allUsers.docs.some(d => d.id !== id && normalizeUsername(d.data()?.username) === nextUsername);
+    }
+    if (hasOtherUser) {
+      throw new Error('Username is already taken. Please choose another username.');
+    }
+  }
+
   if (payload.password) {
-    // Update Firebase Auth password using the current password provided by admin
-    const snap = await getDoc(doc(db, "users", id));
-    if (snap.exists()) {
-      const current = snap.data();
-      if (current.email && payload.currentPassword) {
+    // Client-side Firebase apps cannot admin-reset another user's password without credentials.
+    // Require current password to securely rotate the target account's password.
+    if (!payload.currentPassword) {
+      throw new Error('Current password is required to set a new password.');
+    }
+
+    if (current.email) {
+      try {
         await updateAuthUserPassword(current.email, payload.currentPassword, payload.password);
+      } catch (err) {
+        if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
+          throw new Error('Current password is incorrect for this user.');
+        }
+        throw err;
       }
     }
   }
+
   // Never store password or currentPassword in Firestore
   const { password: _, currentPassword: __, ...toStore } = payload;
+  toStore.username = nextUsername;
+  toStore.usernameNormalized = nextUsername;
+
   await updateDoc(doc(db, "users", id), toStore);
   return { id, ...toStore };
 }

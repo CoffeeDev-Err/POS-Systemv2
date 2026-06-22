@@ -168,6 +168,16 @@ export default function App() {
     return <Login onLogin={handleLogin} loading={loading} error={loadError} theme={theme} onToggleTheme={toggleTheme} />;
   }
 
+  const handleUpdateUserWithSessionSync = async (id, payload) => {
+    const updated = await handleUpdateUser(id, payload);
+    if (currentUser?.id === id) {
+      const merged = { ...currentUser, ...updated, id: currentUser.id };
+      setCurrentUser(merged);
+      localStorage.setItem('pos_user', JSON.stringify(merged));
+    }
+    return updated;
+  };
+
   const renderPage = () => {
     const props = {
       products,
@@ -186,7 +196,7 @@ export default function App() {
       onCreateCategory: handleCreateCategory,
       onDeleteCategory: handleDeleteCategory,
       onCreateUser: handleCreateUser,
-      onUpdateUser: handleUpdateUser,
+      onUpdateUser: handleUpdateUserWithSessionSync,
       onUpdateUserStatus: handleUpdateUserStatus,
       onDeleteUser: handleDeleteUser,
       onCreateTransaction: handleCreateTransaction,
