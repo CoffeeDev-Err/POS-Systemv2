@@ -168,7 +168,7 @@ export default function Users({ users, currentUser, auditLogs, onCreateUser, onU
                     const ri = ROLE_INFO[u.role] || { label: u.role || 'Unknown', color: 'secondary', icon: 'bi-person' };
                     const isSelf = u.id === currentUser.id;
                     return (
-                      <tr key={u.id} className={isSelf ? 'table-light' : ''}>
+                      <tr key={u.id} className={isSelf ? 'users-self-row' : ''}>
                         <td>
                           <div className="d-flex align-items-center gap-2">
                             <div className="user-avatar-sm">{(u.name || '?').charAt(0)}</div>

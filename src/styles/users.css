@@ -12,3 +12,12 @@
   font-size: 0.8rem;
   flex-shrink: 0;
 }
+
+/* Keep the signed-in user's row visually stable across themes (no Bootstrap light-row effect). */
+.table-hover > tbody > tr.users-self-row > * {
+  background-color: transparent;
+}
+
+.table-hover > tbody > tr.users-self-row:hover > * {
+  background-color: transparent;
+}
