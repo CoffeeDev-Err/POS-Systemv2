@@ -117,7 +117,11 @@ export async function createUser(payload) {
 
   // Keep Firestore user id aligned with Firebase Auth uid for future compatibility.
   await setDoc(doc(db, 'users', uid), data, { merge: true });
-  return { id: uid, ...data };
+  const createdSnap = await getDoc(doc(db, 'users', uid));
+  if (!createdSnap.exists()) {
+    return { id: uid, ...safe, username, usernameNormalized: username, active: payload.active !== false, email };
+  }
+  return { id: uid, ...serialize(createdSnap.data()) };
 }
 
 export async function updateUser(id, payload) {
