@@ -37,6 +37,12 @@ function toSyntheticEmail(username) {
   return `${normalizeUsername(username).replace(/[^a-z0-9._-]/g, '.')}@carrensstore.app`;
 }
 
+function toUniqueSyntheticEmail(username) {
+  const base = normalizeUsername(username).replace(/[^a-z0-9._-]/g, '.');
+  const nonce = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  return `${base}.${nonce}@carrensstore.app`;
+}
+
 function sanitizeOrderItemsForAudit(items = []) {
   return (items || []).map(item => ({
     productId: item.productId || '',
@@ -101,8 +107,36 @@ export async function createUser(payload) {
 
   // Derive a synthetic email so Firebase Auth has something to work with.
   // Users only ever log in with their username — the email is internal.
-  const email = toSyntheticEmail(username);
-  const uid = await createAuthUser(email, payload.password);
+  let email = toSyntheticEmail(username);
+  let uid = null;
+  let createErr = null;
+
+  // If an old/deleted account already consumed the default synthetic email,
+  // retry with a unique internal email to keep username-based login working.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      uid = await createAuthUser(email, payload.password);
+      createErr = null;
+      break;
+    } catch (err) {
+      createErr = err;
+      if (err?.code === 'auth/email-already-in-use' && attempt < 2) {
+        email = toUniqueSyntheticEmail(username);
+        continue;
+      }
+      break;
+    }
+  }
+
+  if (!uid) {
+    if (createErr?.code === 'auth/email-already-in-use') {
+      throw new Error('Unable to create account right now. Please try again in a few seconds.');
+    }
+    if (createErr?.code === 'auth/weak-password') {
+      throw new Error('Password is too weak. Please use at least 6 characters.');
+    }
+    throw createErr || new Error('Failed to create user account.');
+  }
 
   // Never store plaintext password in Firestore
   const { password: _, currentPassword: __, ...safe } = payload;
